@@ -1,0 +1,30 @@
+{
+  "processing": {
+    "max_daily_processing": 5,
+    "max_processing_time_minutes": 300,
+    "video_extensions": [".mkv", ".mp4", ".avi", ".mov", ".m4v"],
+    "mute_padding_before_ms": 500,
+    "mute_padding_after_ms": 500
+  },
+  "paths": {
+    "input_dir": "/input",
+    "output_dir": "/output",
+    "config_dir": "/config",
+    "logs_dir": "/logs"
+  },
+  "opensubtitles": {
+    "enabled": true,
+    "language": "en",
+    "username": null,
+    "password": null,
+    "api_key": null
+  },
+  "ffmpeg": {
+    "threads": 2,
+    "audio_codec": "aac",
+    "audio_bitrate": "192k",
+    "re_encode_video": false,
+    "video_codec": null,
+    "video_crf": 23
+  }
+}

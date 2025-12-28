@@ -1,0 +1,43 @@
+# Profanity Word List
+# 
+# This file contains words that will be detected in subtitles and muted in the audio.
+# Each word should be on its own line.
+# Lines starting with # are comments and will be ignored.
+# Words are case-insensitive.
+#
+# Format: One word per line
+# Example:
+#   damn
+#   hell
+#   sh*t  (asterisks will be treated as wildcards)
+#
+# Last updated: 2025-01-01
+
+# Mild profanity
+damn
+hell
+crap
+ass
+bastard
+
+# Moderate profanity
+bitch
+piss
+shit
+bullshit
+
+# Strong profanity
+fuck
+fucking
+motherfucker
+asshole
+
+# Religious profanity
+goddamn
+jesus christ
+
+# Slurs and offensive terms
+# Add context-specific terms here
+
+# Custom additions
+# Add your own words below this line

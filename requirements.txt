@@ -1,0 +1,19 @@
+# Cleanvid - Automated Movie Profanity Filter
+
+Core dependencies for the cleanvid application.
+
+## Core Processing
+pysrt>=1.1.2              # SRT subtitle parsing
+subliminal>=2.1.0         # Subtitle download from OpenSubtitles
+ffmpeg-python>=0.2.0      # FFmpeg wrapper for video processing
+
+## Data Validation & Models
+pydantic>=2.0.0           # Data validation and settings management
+python-dotenv>=1.0.0      # Environment variable management
+
+## Utilities
+requests>=2.31.0          # HTTP requests
+babelfish>=0.6.0          # Language/country codes (for subliminal)
+
+## File Processing
+chardet>=5.2.0            # Character encoding detection
