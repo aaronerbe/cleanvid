@@ -1,7 +1,11 @@
 """
-Subtitle management service.
+Subtitle management service - HOTFIX VERSION
 
 Handles subtitle file operations including parsing, downloading, and format handling.
+FIXES: 
+- Encoding detection (UTF-8 → ISO-8859-1 → Windows-1252 → Latin-1)
+- Empty subtitle entry filtering
+- BOM (Byte Order Mark) handling
 """
 
 import pysrt
@@ -159,6 +163,7 @@ class SubtitleManager:
     def download_subtitles(
         self,
         video_path: Path,
+        #language: str = 'en',
         language: Optional[str] = None,
         output_dir: Optional[Path] = None
     ) -> Optional[Path]:
@@ -199,6 +204,7 @@ class SubtitleManager:
             subtitles = download_best_subtitles(
                 {video},
                 languages,
+                # Add providers based on config
                 providers=['opensubtitles'] if self.config.enabled else []
             )
             

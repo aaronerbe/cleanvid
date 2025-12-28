@@ -27,6 +27,9 @@ RUN mkdir -p /input /output /config /logs
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
+# Expose web dashboard port
+EXPOSE 8080
+
 # Default command
 ENTRYPOINT ["cleanvid"]
 CMD ["--help"]

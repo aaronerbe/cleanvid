@@ -17,3 +17,7 @@ babelfish>=0.6.0          # Language/country codes (for subliminal)
 
 ## File Processing
 chardet>=5.2.0            # Character encoding detection
+
+## Web Dashboard
+flask>=2.3.0              # Web framework for dashboard
+flask-cors>=4.0.0         # Cross-origin resource sharing

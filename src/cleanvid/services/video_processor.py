@@ -4,6 +4,7 @@ Video processing service.
 Handles video file processing including profanity detection and audio muting.
 """
 
+import shutil
 from pathlib import Path
 from typing import Optional, List
 from datetime import datetime
@@ -134,10 +135,24 @@ class VideoProcessor:
             segments = self.profanity_detector.detect_in_subtitle_file(subtitle_file)
             
             if len(segments) == 0:
-                # No profanity detected - video is clean
-                result.status = ProcessingStatus.SKIPPED
-                result.mark_complete(success=True, error="No profanity detected")
-                result.add_warning("Video is clean - no processing needed")
+                # No profanity detected - copy clean video to output
+                try:
+                    # Ensure output directory exists
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Copy file
+                    shutil.copy2(video_path, output_path)
+                    
+                    result.output_path = output_path
+                    result.status = ProcessingStatus.SKIPPED
+                    result.mark_complete(success=True, error="No profanity detected - clean video copied")
+                    result.add_warning("Video is clean - copied to output without processing")
+                    
+                    print(f"  ✓ Clean video copied to output")
+                    
+                except Exception as copy_error:
+                    result.mark_complete(success=False, error=f"Failed to copy clean video: {copy_error}")
+                
                 return result
             
             # Step 3: Add padding and merge overlapping segments
@@ -257,18 +272,18 @@ class VideoProcessor:
         ]
         
         if result.success:
-            lines.append(f"✓ Successfully processed")
-            lines.append(f"  Segments muted: {result.segments_muted}")
-            lines.append(f"  Processing time: {result.duration_minutes:.1f} minutes")
+            if result.status == ProcessingStatus.SKIPPED:
+                lines.append(f"⊘ Clean video (copied to output)")
+            else:
+                lines.append(f"✓ Successfully processed")
+                lines.append(f"  Segments muted: {result.segments_muted}")
+                lines.append(f"  Processing time: {result.duration_minutes:.1f} minutes")
             
             if result.subtitle_downloaded:
                 lines.append(f"  Subtitle: Downloaded")
             
             if result.output_path:
                 lines.append(f"  Output: {result.output_path}")
-        
-        elif result.status == ProcessingStatus.SKIPPED:
-            lines.append(f"⊘ Skipped (no profanity detected)")
         
         else:
             lines.append(f"✗ Failed")

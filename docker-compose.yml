@@ -1,23 +1,26 @@
 version: '3.8'
 
 services:
-  cleanvid:
+  cleanvid2:
     build: .
-    image: cleanvid:latest
-    container_name: cleanvid
+    image: cleanvid:2.0
+    container_name: cleanvid2
     
     volumes:
       # Mount your video directories
-      - /volume1/movies/original:/input:ro           # Read-only input
-      - /volume1/movies/filtered:/output             # Writable output
-      - /volume1/docker/cleanvid/config:/config      # Configuration
-      - /volume1/docker/cleanvid/logs:/logs          # Logs
+      - /volume1/Videos:/input:ro                    # Read-only input
+      - /volume1/Videos-Filtered:/output             # Writable output
+      - /volume1/docker/cleanvid2/config:/config     # Configuration
+      - /volume1/docker/cleanvid2/logs:/logs         # Logs
+    
+    ports:
+      - "8080:8080"                                   # Web dashboard
     
     environment:
       - TZ=America/New_York                          # Set your timezone
     
-    # Uncomment for scheduled processing via cron
-    # command: process --max-time 300
+    # Run web dashboard by default
+    command: web
     
     restart: unless-stopped
     

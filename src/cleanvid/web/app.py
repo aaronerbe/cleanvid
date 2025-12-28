@@ -1,0 +1,234 @@
+"""
+Web dashboard Flask application for Cleanvid.
+
+Provides REST API and web interface for monitoring video processing.
+"""
+
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+from pathlib import Path
+import json
+from datetime import datetime
+from typing import Dict, List, Any
+
+from cleanvid.services.processor import Processor
+from cleanvid.services.config_manager import ConfigManager
+
+
+app = Flask(__name__, static_folder='static')
+CORS(app)
+
+# Initialize processor
+processor = None
+
+
+def get_processor():
+    """Get or create processor instance."""
+    global processor
+    if processor is None:
+        processor = Processor()
+    return processor
+
+
+@app.route('/')
+def index():
+    """Serve the dashboard HTML."""
+    return send_from_directory('static', 'dashboard.html')
+
+
+@app.route('/api/status')
+def api_status():
+    """Get current system status."""
+    try:
+        proc = get_processor()
+        status = proc.get_status()
+        
+        # Add additional info
+        status['timestamp'] = datetime.now().isoformat()
+        
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/history')
+def api_history():
+    """Get processing history."""
+    try:
+        proc = get_processor()
+        limit = request.args.get('limit', 20, type=int)
+        history = proc.get_recent_history(limit=limit)
+        
+        return jsonify({
+            'history': history,
+            'total': len(history)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/failures')
+def api_failures():
+    """Get failed videos only."""
+    try:
+        proc = get_processor()
+        history = proc.get_recent_history(limit=100)
+        
+        failures = [
+            entry for entry in history
+            if not entry.get('success', False)
+        ]
+        
+        # Group by error type
+        error_groups = {}
+        for failure in failures:
+            error = failure.get('error', 'Unknown error')
+            error_type = classify_error(error)
+            if error_type not in error_groups:
+                error_groups[error_type] = []
+            error_groups[error_type].append(failure)
+        
+        return jsonify({
+            'failures': failures,
+            'total': len(failures),
+            'error_groups': error_groups
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/statistics')
+def api_statistics():
+    """Get processing statistics."""
+    try:
+        proc = get_processor()
+        file_stats = proc.file_manager.get_file_statistics()
+        
+        # Calculate success rate from history
+        history = proc.get_recent_history(limit=100)
+        total_processed = len(history)
+        successful = sum(1 for h in history if h.get('success', False))
+        success_rate = (successful / total_processed * 100) if total_processed > 0 else 0
+        
+        return jsonify({
+            'file_stats': file_stats,
+            'processing_stats': {
+                'total_processed': total_processed,
+                'successful': successful,
+                'failed': total_processed - successful,
+                'success_rate': round(success_rate, 1)
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/process', methods=['POST'])
+def api_process():
+    """Process a specific video."""
+    try:
+        data = request.json
+        video_path = data.get('video_path')
+        
+        if not video_path:
+            return jsonify({'error': 'video_path required'}), 400
+        
+        proc = get_processor()
+        video_path = Path(video_path)
+        
+        # Check if exists
+        if not video_path.exists():
+            return jsonify({'error': f'Video not found: {video_path}'}), 404
+        
+        # Process it
+        stats = proc.process_single(video_path)
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                'total_videos': stats.total_videos,
+                'successful': stats.successful,
+                'failed': stats.failed,
+                'skipped': stats.skipped
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reset', methods=['POST'])
+def api_reset():
+    """Reset a video's processing status."""
+    try:
+        data = request.json
+        video_path = data.get('video_path')
+        
+        if not video_path:
+            return jsonify({'error': 'video_path required'}), 400
+        
+        proc = get_processor()
+        video_path = Path(video_path)
+        
+        success = proc.reset_video(video_path)
+        
+        return jsonify({
+            'success': success,
+            'message': 'Video reset successfully' if success else 'Video was not processed'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/search')
+def api_search():
+    """Search for videos by name."""
+    try:
+        query = request.args.get('q', '').lower()
+        
+        if not query:
+            return jsonify({'error': 'Query parameter "q" required'}), 400
+        
+        proc = get_processor()
+        all_videos = proc.file_manager.discover_videos()
+        
+        # Filter by query
+        matches = [
+            str(video) for video in all_videos
+            if query in video.name.lower()
+        ]
+        
+        return jsonify({
+            'matches': matches[:20],  # Limit to 20 results
+            'total': len(matches)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def classify_error(error_msg: str) -> str:
+    """Classify error message into category."""
+    error_lower = error_msg.lower()
+    
+    if 'encoding' in error_lower or 'utf-8' in error_lower or 'decode' in error_lower:
+        return 'Encoding Error'
+    elif 'subtitle' in error_lower and 'not found' in error_lower:
+        return 'Missing Subtitle'
+    elif 'subtitle' in error_lower and 'empty' in error_lower:
+        return 'Empty Subtitle'
+    elif 'ffmpeg' in error_lower:
+        return 'FFmpeg Error'
+    elif 'directory' in error_lower or '@eadir' in error_lower:
+        return 'Invalid Path'
+    elif 'not found' in error_lower:
+        return 'File Not Found'
+    else:
+        return 'Other Error'
+
+
+def run_server(host='0.0.0.0', port=8080, debug=False):
+    """Run the Flask development server."""
+    app.run(host=host, port=port, debug=debug)
+
+
+if __name__ == '__main__':
+    run_server(debug=True)

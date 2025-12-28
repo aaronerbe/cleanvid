@@ -153,6 +153,15 @@ def cmd_config(args):
         print(f"  cleanvid config --validate")
 
 
+def cmd_web(args):
+    """Start web dashboard."""
+    print(f"Starting Cleanvid web dashboard on http://{args.host}:{args.port}")
+    print("Press Ctrl+C to stop")
+    
+    from cleanvid.web.app import run_server
+    run_server(host=args.host, port=args.port, debug=args.verbose)
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -168,6 +177,7 @@ Examples:
   cleanvid history                       Show recent processing
   cleanvid reset movie.mkv               Reset video status
   cleanvid config --validate             Validate configuration
+  cleanvid web                           Start web dashboard
 
 For more information: https://github.com/yourusername/cleanvid
         """
@@ -285,6 +295,24 @@ For more information: https://github.com/yourusername/cleanvid
         help='Validate configuration'
     )
     parser_config.set_defaults(func=cmd_config)
+    
+    # web command
+    parser_web = subparsers.add_parser(
+        'web',
+        help='Start web dashboard'
+    )
+    parser_web.add_argument(
+        '--port',
+        type=int,
+        default=8080,
+        help='Port to run web server (default: 8080)'
+    )
+    parser_web.add_argument(
+        '--host',
+        default='0.0.0.0',
+        help='Host to bind to (default: 0.0.0.0)'
+    )
+    parser_web.set_defaults(func=cmd_web)
     
     # Parse arguments
     args = parser.parse_args()
