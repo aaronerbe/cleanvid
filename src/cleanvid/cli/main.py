@@ -106,18 +106,42 @@ def cmd_history(args):
 
 
 def cmd_reset(args):
-    """Reset processing status for a video."""
+    """Reset processing status for a video or videos."""
     config_dir = Path(args.config) if args.config else None
     processor = Processor(config_path=config_dir)
     
-    video_path = Path(args.video)
-    
-    if processor.reset_video(video_path):
-        print(f"✓ Reset processing status for: {video_path.name}")
-        print(f"  Video will be reprocessed on next run.")
+    # Handle --filter option
+    if args.filter:
+        if args.filter == 'failed':
+            count = processor.reset_failed_videos()
+            if count > 0:
+                print(f"✓ Reset {count} failed video(s)")
+                print(f"  These videos will be reprocessed on next run.")
+            else:
+                print("No failed videos found.")
+        elif args.filter == 'all':
+            # Reset all processed videos
+            processor.file_manager.clear_processed_log()
+            print("✓ Reset all processed videos")
+            print("  All videos will be reprocessed on next run.")
+        else:
+            print(f"✗ Invalid filter: {args.filter}")
+            print("  Valid filters: failed, all")
+            sys.exit(1)
     else:
-        print(f"✗ Video was not marked as processed: {video_path.name}")
-        sys.exit(1)
+        # Reset specific video
+        if not args.video:
+            print("✗ Error: Either specify a video file or use --filter")
+            sys.exit(1)
+        
+        video_path = Path(args.video)
+        
+        if processor.reset_video(video_path):
+            print(f"✓ Reset processing status for: {video_path.name}")
+            print(f"  Video will be reprocessed on next run.")
+        else:
+            print(f"✗ Video was not marked as processed: {video_path.name}")
+            sys.exit(1)
 
 
 def cmd_config(args):
@@ -271,11 +295,17 @@ For more information: https://github.com/yourusername/cleanvid
     # reset command
     parser_reset = subparsers.add_parser(
         'reset',
-        help='Reset processing status for a video'
+        help='Reset processing status for video(s)'
     )
     parser_reset.add_argument(
         'video',
+        nargs='?',
         help='Video file to reset'
+    )
+    parser_reset.add_argument(
+        '--filter',
+        choices=['failed', 'all'],
+        help='Reset multiple videos: "failed" (only failed videos) or "all" (all processed videos)'
     )
     parser_reset.set_defaults(func=cmd_reset)
     

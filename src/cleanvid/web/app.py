@@ -179,6 +179,22 @@ def api_reset():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/reset-failed', methods=['POST'])
+def api_reset_failed():
+    """Reset all failed videos."""
+    try:
+        proc = get_processor()
+        count = proc.reset_failed_videos()
+        
+        return jsonify({
+            'success': True,
+            'count': count,
+            'message': f'Reset {count} failed video(s)'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/search')
 def api_search():
     """Search for videos by name."""
@@ -200,6 +216,125 @@ def api_search():
         return jsonify({
             'matches': matches[:20],  # Limit to 20 results
             'total': len(matches)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/browse')
+def api_browse():
+    """Browse filesystem for videos."""
+    try:
+        path = request.args.get('path', '')
+        proc = get_processor()
+        
+        # Start from input directory if no path specified
+        if not path:
+            base_path = proc.file_manager.path_config.input_dir
+        else:
+            base_path = Path(path)
+        
+        # Security: ensure path is within input directory
+        input_dir = proc.file_manager.path_config.input_dir
+        try:
+            base_path.relative_to(input_dir)
+        except ValueError:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        if not base_path.exists():
+            return jsonify({'error': 'Path not found'}), 404
+        
+        items = []
+        
+        # Add parent directory link if not at root
+        if base_path != input_dir:
+            items.append({
+                'name': '..',
+                'path': str(base_path.parent),
+                'type': 'directory'
+            })
+        
+        # List directories and video files
+        try:
+            for item in sorted(base_path.iterdir()):
+                # Skip Synology metadata
+                if proc.file_manager._is_synology_metadata_path(item):
+                    continue
+                
+                if item.is_dir():
+                    items.append({
+                        'name': item.name,
+                        'path': str(item),
+                        'type': 'directory'
+                    })
+                elif item.suffix.lower() in proc.file_manager.processing_config.video_extensions:
+                    items.append({
+                        'name': item.name,
+                        'path': str(item),
+                        'type': 'file',
+                        'size': item.stat().st_size
+                    })
+        except PermissionError:
+            return jsonify({'error': 'Permission denied'}), 403
+        
+        return jsonify({
+            'current_path': str(base_path),
+            'items': items
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/wordlist')
+def api_get_wordlist():
+    """Get profanity word list."""
+    try:
+        proc = get_processor()
+        word_list_path = proc.settings.get_word_list_path()
+        
+        if not word_list_path.exists():
+            return jsonify({'error': 'Word list not found'}), 404
+        
+        with open(word_list_path, 'r', encoding='utf-8') as f:
+            words = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+        
+        return jsonify({
+            'words': words,
+            'count': len(words)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/wordlist', methods=['POST'])
+def api_update_wordlist():
+    """Update profanity word list."""
+    try:
+        data = request.json
+        words = data.get('words', [])
+        
+        if not isinstance(words, list):
+            return jsonify({'error': 'words must be a list'}), 400
+        
+        proc = get_processor()
+        word_list_path = proc.settings.get_word_list_path()
+        
+        # Save word list
+        with open(word_list_path, 'w', encoding='utf-8') as f:
+            f.write('# Profanity word list\n')
+            f.write('# One word per line\n')
+            f.write('# Wildcards: * (any characters), ? (single character)\n\n')
+            for word in words:
+                if word.strip():
+                    f.write(f"{word.strip()}\n")
+        
+        # Reload profanity detector
+        proc.reload_config()
+        
+        return jsonify({
+            'success': True,
+            'count': len(words),
+            'message': f'Updated word list with {len(words)} words'
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

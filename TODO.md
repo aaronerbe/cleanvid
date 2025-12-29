@@ -227,6 +227,12 @@
 ## Future Enhancements (Post-v1.0)
 
 ### High Priority
+- [ ] Add `cleanvid reset --filter failed` command
+  - [ ] Enhance `reset` command to accept `--filter` option
+  - [ ] Support filtering by status: `failed`, `success`, `all`
+  - [ ] Add confirmation prompt for bulk resets
+  - [ ] Update CLI help text and examples
+  - **Current workaround:** Use `scripts/retry_failed.sh` to manually remove failed entries from JSON
 - [ ] Web dashboard for monitoring
 - [ ] Email notifications on completion/errors
 - [ ] Multiple severity levels (mild/moderate/strong)

@@ -23,9 +23,30 @@
                 opacity: .5;
             }
         }
-        .log-container {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 50;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal.show {
+            display: block;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
@@ -91,12 +112,13 @@
                     </div>
                 </div>
 
-                <!-- Profanity Words -->
-                <div class="stat-card bg-white rounded-lg shadow-md p-6">
+                <!-- Profanity Words - NOW CLICKABLE! -->
+                <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="openWordListModal()">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-gray-500 text-sm">Word List</p>
                             <p id="wordCount" class="text-2xl font-bold">--</p>
+                            <p class="text-xs text-blue-600 mt-1">Click to edit</p>
                         </div>
                         <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
@@ -105,7 +127,6 @@
                 </div>
             </div>
         </section>
-
         <!-- Statistics -->
         <section class="mb-8">
             <h2 class="text-2xl font-bold mb-4">Processing Statistics</h2>
@@ -150,13 +171,18 @@
                 </div>
             </section>
 
-            <!-- Failed Videos -->
+            <!-- Failed Videos - WITH RESET ALL BUTTON! -->
             <section>
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold">Failed Videos</h2>
-                    <button onclick="refreshFailures()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                        Refresh
-                    </button>
+                    <div class="flex gap-2">
+                        <button onclick="resetAllFailed()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">
+                            Reset All Failed
+                        </button>
+                        <button onclick="refreshFailures()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                            Refresh
+                        </button>
+                    </div>
                 </div>
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     <div id="failedVideos" class="divide-y max-h-96 overflow-y-auto">
@@ -166,7 +192,7 @@
             </section>
         </div>
 
-        <!-- Process Video Section -->
+        <!-- Process Video Section - WITH BROWSE BUTTON! -->
         <section class="mb-8">
             <h2 class="text-2xl font-bold mb-4">Process Video</h2>
             <div class="bg-white rounded-lg shadow-md p-6">
@@ -178,6 +204,9 @@
                         class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         onkeyup="searchVideos()"
                     />
+                    <button onclick="openBrowseModal()" class="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">
+                        Browse
+                    </button>
                     <button onclick="processSelected()" class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
                         Process
                     </button>
@@ -195,9 +224,54 @@
             <p>Cleanvid Dashboard v1.0 | <a href="https://github.com" class="text-blue-400 hover:text-blue-300">GitHub</a></p>
         </div>
     </footer>
+    <!-- File Browser Modal -->
+    <div id="browseModal" class="modal">
+        <div class="modal-content">
+            <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold">Browse Videos</h3>
+                <button onclick="closeBrowseModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
+            </div>
+            <div class="px-6 py-4">
+                <div id="currentPath" class="text-sm text-gray-600 mb-4"></div>
+                <div id="browseItems" class="max-h-96 overflow-y-auto">
+                    <!-- Browser items will appear here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Word List Editor Modal -->
+    <div id="wordListModal" class="modal">
+        <div class="modal-content">
+            <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold">Edit Word List</h3>
+                <button onclick="closeWordListModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
+            </div>
+            <div class="px-6 py-4">
+                <p class="text-sm text-gray-600 mb-4">One word per line. Use * for wildcards (e.g., "sh*t" matches "shoot", "shut", etc.)</p>
+                <textarea 
+                    id="wordListEditor" 
+                    class="w-full h-96 p-4 border border-gray-300 rounded font-mono text-sm"
+                    placeholder="Loading..."
+                ></textarea>
+                <div class="mt-4 flex justify-between items-center">
+                    <span id="wordListCount" class="text-sm text-gray-600">0 words</span>
+                    <div class="flex gap-2">
+                        <button onclick="closeWordListModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                            Cancel
+                        </button>
+                        <button onclick="saveWordList()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         let selectedVideoPath = null;
+        let currentBrowsePath = '';
 
         // Auto-refresh every 10 seconds
         setInterval(() => {
@@ -211,13 +285,11 @@
         refreshStatistics();
         refreshHistory();
         refreshFailures();
-
         async function refreshStatus() {
             try {
                 const response = await fetch('/api/status');
                 const data = await response.json();
                 
-                // Update status displays
                 document.getElementById('containerStatus').textContent = '●';
                 document.getElementById('containerStatus').className = 'text-2xl font-bold text-green-600 pulse-green';
                 
@@ -229,7 +301,6 @@
                 document.getElementById('processedVideos').textContent = data.processed_videos || '--';
                 document.getElementById('unprocessedVideos').textContent = data.unprocessed_videos || '--';
                 
-                // Update last update time
                 const now = new Date();
                 document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
             } catch (error) {
@@ -286,7 +357,7 @@
                                 </div>
                                 <div class="text-sm text-gray-500 mt-1">${timestamp}</div>
                                 ${entry.segments_muted ? `<div class="text-sm text-blue-600 mt-1">Segments muted: ${entry.segments_muted}</div>` : ''}
-                                ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error}</div>` : ''}
+                                ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error.substring(0, 100)}${entry.error.length > 100 ? '...' : ''}</div>` : ''}
                             </div>
                         </div>
                     `;
@@ -317,17 +388,26 @@
                     
                     const videoName = entry.video_path.split('/').pop();
                     const error = entry.error || 'Unknown error';
+                    const escapedPath = entry.video_path.replace(/'/g, "\\'");
                     
                     div.innerHTML = `
                         <div>
                             <div class="font-medium text-red-600">${videoName}</div>
-                            <div class="text-sm text-gray-600 mt-1">${error}</div>
-                            <button 
-                                onclick="retryVideo('${entry.video_path}')" 
-                                class="mt-2 text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                            >
-                                Retry
-                            </button>
+                            <div class="text-sm text-gray-600 mt-1">${error.substring(0, 100)}${error.length > 100 ? '...' : ''}</div>
+                            <div class="mt-2 flex gap-2">
+                                <button 
+                                    onclick="resetVideo('${escapedPath}')" 
+                                    class="text-sm px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600"
+                                >
+                                    Reset
+                                </button>
+                                <button 
+                                    onclick="retryVideo('${escapedPath}')" 
+                                    class="text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                >
+                                    Retry
+                                </button>
+                            </div>
                         </div>
                     `;
                     
@@ -393,12 +473,8 @@
             try {
                 const response = await fetch('/api/process', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        video_path: selectedVideoPath
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: selectedVideoPath })
                 });
                 
                 const data = await response.json();
@@ -416,27 +492,48 @@
             }
         }
 
+        // NEW FUNCTION: Reset individual video
+        async function resetVideo(videoPath) {
+            if (!confirm(`Reset ${videoPath.split('/').pop()}?\n\nThis will remove it from the failed list so it can be retried in the next batch job.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Video reset successfully! It will be retried in the next batch job.');
+                    refreshFailures();
+                    refreshStatistics();
+                } else {
+                    alert('Error: ' + (data.message || 'Reset failed'));
+                }
+            } catch (error) {
+                alert('Error resetting video: ' + error.message);
+            }
+        }
+
         async function retryVideo(videoPath) {
             if (!confirm(`Retry ${videoPath.split('/').pop()}?`)) {
                 return;
             }
             
             try {
-                // First reset it
                 await fetch('/api/reset', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ video_path: videoPath })
                 });
                 
-                // Then process it
                 const response = await fetch('/api/process', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ video_path: videoPath })
                 });
                 
@@ -451,6 +548,148 @@
                 }
             } catch (error) {
                 alert('Error retrying video: ' + error.message);
+            }
+        }
+
+        // NEW FUNCTION: Reset all failed videos
+        async function resetAllFailed() {
+            if (!confirm('Reset ALL failed videos?\n\nThis will remove all failed videos from the processed log so they can be retried in the next batch job.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/reset-failed', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`Successfully reset ${data.count} failed video(s)!`);
+                    refreshFailures();
+                    refreshStatistics();
+                } else {
+                    alert('Error: ' + (data.message || 'Reset failed'));
+                }
+            } catch (error) {
+                alert('Error resetting failed videos: ' + error.message);
+            }
+        }
+
+        // NEW FUNCTION: File browser
+        async function openBrowseModal() {
+            document.getElementById('browseModal').classList.add('show');
+            await loadBrowseDirectory('');
+        }
+
+        function closeBrowseModal() {
+            document.getElementById('browseModal').classList.remove('show');
+        }
+
+        async function loadBrowseDirectory(path) {
+            try {
+                currentBrowsePath = path;
+                const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                
+                document.getElementById('currentPath').textContent = data.current_path;
+                
+                const container = document.getElementById('browseItems');
+                container.innerHTML = '';
+                
+                data.items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 hover:bg-blue-50 cursor-pointer rounded border-b flex items-center gap-3';
+                    
+                    if (item.type === 'directory') {
+                        div.innerHTML = `
+                            <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                            </svg>
+                            <span class="flex-1 font-medium">${item.name}</span>
+                        `;
+                        div.onclick = () => loadBrowseDirectory(item.path);
+                    } else {
+                        const sizeGB = (item.size / (1024 ** 3)).toFixed(2);
+                        div.innerHTML = `
+                            <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                            </svg>
+                            <span class="flex-1">${item.name}</span>
+                            <span class="text-sm text-gray-500">${sizeGB} GB</span>
+                        `;
+                        div.onclick = () => {
+                            selectVideo(item.path);
+                            closeBrowseModal();
+                        };
+                    }
+                    
+                    container.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error loading directory:', error);
+                alert('Error loading directory: ' + error.message);
+            }
+        }
+
+        // NEW FUNCTION: Word list editor
+        async function openWordListModal() {
+            document.getElementById('wordListModal').classList.add('show');
+            
+            try {
+                const response = await fetch('/api/wordlist');
+                const data = await response.json();
+                
+                const editor = document.getElementById('wordListEditor');
+                editor.value = data.words.join('\n');
+                updateWordListCount();
+            } catch (error) {
+                console.error('Error loading word list:', error);
+                alert('Error loading word list: ' + error.message);
+            }
+        }
+
+        function closeWordListModal() {
+            document.getElementById('wordListModal').classList.remove('show');
+        }
+
+        function updateWordListCount() {
+            const editor = document.getElementById('wordListEditor');
+            const words = editor.value.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+            document.getElementById('wordListCount').textContent = `${words.length} words`;
+        }
+
+        document.getElementById('wordListEditor').addEventListener('input', updateWordListCount);
+
+        async function saveWordList() {
+            const editor = document.getElementById('wordListEditor');
+            const words = editor.value.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && !line.startsWith('#'));
+            
+            if (!confirm(`Save ${words.length} words to the profanity list?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/wordlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ words })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`Word list updated successfully! ${data.count} words saved.`);
+                    closeWordListModal();
+                    refreshStatus();
+                } else {
+                    alert('Error: ' + (data.message || 'Save failed'));
+                }
+            } catch (error) {
+                alert('Error saving word list: ' + error.message);
             }
         }
     </script>

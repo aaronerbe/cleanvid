@@ -360,6 +360,72 @@ class FileManager:
         
         return True
     
+    def reset_failed_videos(self) -> int:
+        """
+        Reset all failed videos so they can be reprocessed.
+        
+        Returns:
+            Number of failed videos that were reset.
+        """
+        if not self.processed_log_path.exists():
+            return 0
+        
+        try:
+            with open(self.processed_log_path, 'r', encoding='utf-8') as f:
+                entries = json.load(f)
+            
+            # Separate failed and successful entries
+            failed_entries = [e for e in entries if not e.get('success', True)]
+            successful_entries = [e for e in entries if e.get('success', True)]
+            
+            # Remove failed videos from processed set
+            for entry in failed_entries:
+                video_path = entry.get('video_path')
+                if video_path in self._processed_files:
+                    self._processed_files.remove(video_path)
+            
+            # Save only successful entries
+            with open(self.processed_log_path, 'w', encoding='utf-8') as f:
+                json.dump(successful_entries, f, indent=2)
+            
+            return len(failed_entries)
+        
+        except Exception as e:
+            print(f"Error resetting failed videos: {e}")
+            return 0
+    
+    def get_failed_videos(self) -> List[Dict[str, Any]]:
+        """
+        Get list of videos that failed processing.
+        
+        Returns:
+            List of failed video entries with details.
+        """
+        if not self.processed_log_path.exists():
+            return []
+        
+        try:
+            with open(self.processed_log_path, 'r', encoding='utf-8') as f:
+                entries = json.load(f)
+            
+            # Filter failed entries
+            failed = [
+                e for e in entries
+                if not e.get('success', True)
+            ]
+            
+            # Sort by timestamp, newest first
+            failed.sort(
+                key=lambda x: x.get('timestamp', ''),
+                reverse=True
+            )
+            
+            return failed
+        
+        except Exception as e:
+            print(f"Warning: Failed to load failed videos: {e}")
+            return []
+    
     def get_file_statistics(self) -> Dict[str, Any]:
         """
         Get statistics about files.

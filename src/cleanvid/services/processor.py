@@ -318,6 +318,24 @@ class Processor:
         """
         return self.file_manager.reset_processed_status(video_path)
     
+    def reset_failed_videos(self) -> int:
+        """
+        Reset all failed videos so they can be reprocessed.
+        
+        Returns:
+            Number of failed videos that were reset.
+        """
+        return self.file_manager.reset_failed_videos()
+    
+    def get_failed_videos(self) -> List[Dict[str, Any]]:
+        """
+        Get list of videos that failed processing.
+        
+        Returns:
+            List of failed video entries.
+        """
+        return self.file_manager.get_failed_videos()
+    
     def get_recent_history(self, limit: int = 10) -> List[dict]:
         """
         Get recent processing history.
