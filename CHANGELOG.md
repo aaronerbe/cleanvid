@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **FFmpeg H.264 to AVI conversion** - Added h264_mp4toannexb bitstream filter
+  - Fixes "h264 bitstream malformed" error when processing H.264 videos to AVI containers
+  - Automatically applies filter when copying H.264 streams to .avi output files
+  - Prevents "Invalid data found when processing input" FFmpeg errors
+
+---
+
 ## [2.0.0] - 2025-12-28
 
 ### Added

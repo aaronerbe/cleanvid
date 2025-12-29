@@ -182,6 +182,9 @@ class FFmpegWrapper:
         # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
+        # Probe input to get codec info
+        probe_result = self.probe(input_path)
+        
         # Build FFmpeg command
         cmd = [
             self.ffmpeg_path,
@@ -199,6 +202,12 @@ class FFmpegWrapper:
             cmd.extend(['-crf', str(video_crf)])
         else:
             cmd.extend(['-c:v', 'copy'])  # Copy video stream without re-encoding
+            
+            # Add bitstream filter for H.264 to AVI conversion
+            # When copying H.264 stream to AVI container, need to convert from MP4 format to Annex B format
+            output_ext = output_path.suffix.lower()
+            if probe_result.video_codec == 'h264' and output_ext == '.avi':
+                cmd.extend(['-bsf:v', 'h264_mp4toannexb'])
         
         # Output file
         cmd.extend([
