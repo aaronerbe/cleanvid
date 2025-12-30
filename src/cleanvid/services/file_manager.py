@@ -429,7 +429,7 @@ class FileManager:
     def bypass_video(self, video_path: Path) -> bool:
         """
         Bypass processing by copying video directly to output.
-        Marks it as processed with 0 segments muted.
+        Updates existing failed entry to show success with bypass message.
         
         Args:
             video_path: Path to input video file.
@@ -444,6 +444,8 @@ class FileManager:
             if not video_path.exists():
                 return False
             
+            video_str = str(video_path)
+            
             # Generate output path
             output_path = self.generate_output_path(
                 video_path,
@@ -456,13 +458,52 @@ class FileManager:
             # Copy file
             shutil.copy2(video_path, output_path)
             
-            # Mark as processed (bypassed)
-            self.mark_as_processed(
-                video_path=video_path,
-                success=True,
-                segments_muted=0,
-                error=None
-            )
+            # Update existing entry or create new one
+            if self.processed_log_path.exists():
+                try:
+                    with open(self.processed_log_path, 'r', encoding='utf-8') as f:
+                        entries = json.load(f)
+                    
+                    # Find existing entry
+                    updated = False
+                    for entry in entries:
+                        if entry.get('video_path') == video_str:
+                            # Update to success with bypass note
+                            entry['success'] = True
+                            entry['segments_muted'] = 0
+                            entry['error'] = 'Bypassed - copied directly to output'
+                            entry['timestamp'] = datetime.now().isoformat()
+                            updated = True
+                            break
+                    
+                    # If no existing entry, add new one
+                    if not updated:
+                        entries.append({
+                            'video_path': video_str,
+                            'timestamp': datetime.now().isoformat(),
+                            'success': True,
+                            'segments_muted': 0,
+                            'error': 'Bypassed - copied directly to output'
+                        })
+                    
+                    # Add to processed set
+                    self._processed_files.add(video_str)
+                    
+                    # Save updated log
+                    with open(self.processed_log_path, 'w', encoding='utf-8') as f:
+                        json.dump(entries, f, indent=2)
+                    
+                except Exception as e:
+                    print(f"Warning: Failed to update log: {e}")
+                    return False
+            else:
+                # No log exists, create new entry
+                self.mark_as_processed(
+                    video_path=video_path,
+                    success=True,
+                    segments_muted=0,
+                    error='Bypassed - copied directly to output'
+                )
             
             return True
             
