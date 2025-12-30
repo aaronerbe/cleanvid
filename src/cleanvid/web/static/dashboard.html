@@ -112,7 +112,7 @@
                     </div>
                 </div>
 
-                <!-- Profanity Words - NOW CLICKABLE! -->
+                <!-- Profanity Words - CLICKABLE -->
                 <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="openWordListModal()">
                     <div class="flex items-center justify-between">
                         <div>
@@ -127,6 +127,7 @@
                 </div>
             </div>
         </section>
+
         <!-- Statistics -->
         <section class="mb-8">
             <h2 class="text-2xl font-bold mb-4">Processing Statistics</h2>
@@ -153,7 +154,6 @@
                 </div>
             </div>
         </section>
-
         <!-- Recent Activity & Failures -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <!-- Recent Activity -->
@@ -171,11 +171,14 @@
                 </div>
             </section>
 
-            <!-- Failed Videos - WITH RESET ALL BUTTON! -->
+            <!-- Failed Videos - WITH SELECT BYPASS BUTTON -->
             <section>
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold">Failed Videos</h2>
                     <div class="flex gap-2">
+                        <button onclick="openBypassModal()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                            Select Bypass
+                        </button>
                         <button onclick="resetAllFailed()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">
                             Reset All Failed
                         </button>
@@ -192,7 +195,7 @@
             </section>
         </div>
 
-        <!-- Process Video Section - WITH BROWSE BUTTON! -->
+        <!-- Process Video Section - WITH BROWSE BUTTON -->
         <section class="mb-8">
             <h2 class="text-2xl font-bold mb-4">Process Video</h2>
             <div class="bg-white rounded-lg shadow-md p-6">
@@ -262,6 +265,39 @@
                         </button>
                         <button onclick="saveWordList()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
                             Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bypass Selection Modal -->
+    <div id="bypassModal" class="modal">
+        <div class="modal-content">
+            <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold">Select Videos to Bypass</h3>
+                <button onclick="closeBypassModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
+            </div>
+            <div class="px-6 py-4">
+                <p class="text-sm text-gray-600 mb-4">Select videos to copy directly to output without processing. Useful for children's videos without subtitles or other safe content.</p>
+                <div id="bypassVideoList" class="max-h-96 overflow-y-auto mb-4">
+                    <!-- Checkboxes will appear here -->
+                </div>
+                <div class="flex justify-between items-center border-t pt-4">
+                    <div>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="selectAllBypass" onchange="toggleSelectAll()">
+                            <span class="text-sm font-medium">Select All</span>
+                        </label>
+                        <span id="bypassSelectedCount" class="text-sm text-gray-600 ml-6">0 selected</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="closeBypassModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                            Cancel
+                        </button>
+                        <button onclick="bypassSelected()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                            Bypass Selected
                         </button>
                     </div>
                 </div>
@@ -396,6 +432,13 @@
                             <div class="text-sm text-gray-600 mt-1">${error.substring(0, 100)}${error.length > 100 ? '...' : ''}</div>
                             <div class="mt-2 flex gap-2">
                                 <button 
+                                    onclick="bypassVideo('${escapedPath}')" 
+                                    class="text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                                    title="Copy video directly to output without processing"
+                                >
+                                    Bypass
+                                </button>
+                                <button 
                                     onclick="resetVideo('${escapedPath}')" 
                                     class="text-sm px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600"
                                 >
@@ -491,8 +534,6 @@
                 alert('Error processing video: ' + error.message);
             }
         }
-
-        // NEW FUNCTION: Reset individual video
         async function resetVideo(videoPath) {
             if (!confirm(`Reset ${videoPath.split('/').pop()}?\n\nThis will remove it from the failed list so it can be retried in the next batch job.`)) {
                 return;
@@ -551,7 +592,6 @@
             }
         }
 
-        // NEW FUNCTION: Reset all failed videos
         async function resetAllFailed() {
             if (!confirm('Reset ALL failed videos?\n\nThis will remove all failed videos from the processed log so they can be retried in the next batch job.')) {
                 return;
@@ -576,8 +616,131 @@
                 alert('Error resetting failed videos: ' + error.message);
             }
         }
+        // Bypass Functions
+        async function bypassVideo(videoPath) {
+            if (!confirm(`Bypass ${videoPath.split('/').pop()}?\n\nThis will copy the video directly to output without processing.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/bypass', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Video bypassed successfully!');
+                    refreshFailures();
+                    refreshStatistics();
+                } else {
+                    alert('Error: ' + (data.message || 'Bypass failed'));
+                }
+            } catch (error) {
+                alert('Error bypassing video: ' + error.message);
+            }
+        }
 
-        // NEW FUNCTION: File browser
+        async function openBypassModal() {
+            document.getElementById('bypassModal').classList.add('show');
+            
+            try {
+                const response = await fetch('/api/failures');
+                const data = await response.json();
+                
+                const container = document.getElementById('bypassVideoList');
+                container.innerHTML = '';
+                
+                if (data.failures.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 p-4">No failed videos to bypass!</p>';
+                    return;
+                }
+                
+                data.failures.forEach(entry => {
+                    const videoName = entry.video_path.split('/').pop();
+                    const div = document.createElement('div');
+                    div.className = 'p-3 border-b hover:bg-gray-50';
+                    
+                    div.innerHTML = `
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                class="bypass-checkbox mt-1" 
+                                value="${entry.video_path.replace(/"/g, '&quot;')}"
+                                onchange="updateBypassCount()"
+                            >
+                            <div class="flex-1">
+                                <div class="font-medium">${videoName}</div>
+                                <div class="text-sm text-gray-600 mt-1">${(entry.error || 'Unknown error').substring(0, 100)}</div>
+                            </div>
+                        </label>
+                    `;
+                    
+                    container.appendChild(div);
+                });
+                
+                updateBypassCount();
+            } catch (error) {
+                console.error('Error loading failed videos:', error);
+                alert('Error loading failed videos: ' + error.message);
+            }
+        }
+
+        function closeBypassModal() {
+            document.getElementById('bypassModal').classList.remove('show');
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAllBypass').checked;
+            document.querySelectorAll('.bypass-checkbox').forEach(cb => {
+                cb.checked = selectAll;
+            });
+            updateBypassCount();
+        }
+
+        function updateBypassCount() {
+            const count = document.querySelectorAll('.bypass-checkbox:checked').length;
+            document.getElementById('bypassSelectedCount').textContent = `${count} selected`;
+        }
+
+        async function bypassSelected() {
+            const checkboxes = document.querySelectorAll('.bypass-checkbox:checked');
+            
+            if (checkboxes.length === 0) {
+                alert('Please select at least one video to bypass');
+                return;
+            }
+            
+            const paths = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (!confirm(`Bypass ${paths.length} video(s)?\n\nThese videos will be copied directly to output without processing.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/bypass-multiple', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_paths: paths })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(data.message);
+                    closeBypassModal();
+                    refreshFailures();
+                    refreshStatistics();
+                } else {
+                    alert('Error: ' + (data.message || 'Bypass failed'));
+                }
+            } catch (error) {
+                alert('Error bypassing videos: ' + error.message);
+            }
+        }
+        // File Browser Functions
         async function openBrowseModal() {
             document.getElementById('browseModal').classList.add('show');
             await loadBrowseDirectory('');
@@ -633,7 +796,7 @@
             }
         }
 
-        // NEW FUNCTION: Word list editor
+        // Word List Editor Functions
         async function openWordListModal() {
             document.getElementById('wordListModal').classList.add('show');
             

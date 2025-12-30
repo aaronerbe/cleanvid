@@ -332,13 +332,37 @@ class Processor:
         return self.file_manager.reset_failed_videos()
 
     def get_failed_videos(self) -> List[Dict[str, Any]]:
+    """
+    Get list of videos that failed processing.
+    
+    Returns:
+    List of failed video entries.
+    """
+    return self.file_manager.get_failed_videos()
+    
+    def bypass_video(self, video_path: Path) -> bool:
         """
-        Get list of videos that failed processing.
-
+        Bypass video by copying directly to output.
+        
+        Args:
+            video_path: Path to video file.
+        
         Returns:
-            List of failed video entries.
+            True if bypass successful, False otherwise.
         """
-        return self.file_manager.get_failed_videos()
+        return self.file_manager.bypass_video(video_path)
+    
+    def bypass_multiple_videos(self, video_paths: List[Path]) -> Dict[str, Any]:
+        """
+        Bypass multiple videos.
+        
+        Args:
+            video_paths: List of video paths to bypass.
+        
+        Returns:
+            Dictionary with results.
+        """
+        return self.file_manager.bypass_multiple_videos(video_paths)
 
     def get_recent_history(self, limit: int = 10) -> List[dict]:
         """

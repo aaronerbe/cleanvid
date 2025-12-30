@@ -426,6 +426,75 @@ class FileManager:
             print(f"Warning: Failed to load failed videos: {e}")
             return []
     
+    def bypass_video(self, video_path: Path) -> bool:
+        """
+        Bypass processing by copying video directly to output.
+        Marks it as processed with 0 segments muted.
+        
+        Args:
+            video_path: Path to input video file.
+        
+        Returns:
+            True if bypass successful, False otherwise.
+        """
+        import shutil
+        
+        try:
+            # Check if input exists
+            if not video_path.exists():
+                return False
+            
+            # Generate output path
+            output_path = self.generate_output_path(
+                video_path,
+                preserve_structure=True
+            )
+            
+            # Ensure output directory exists
+            self.ensure_output_directory(output_path)
+            
+            # Copy file
+            shutil.copy2(video_path, output_path)
+            
+            # Mark as processed (bypassed)
+            self.mark_as_processed(
+                video_path=video_path,
+                success=True,
+                segments_muted=0,
+                error=None
+            )
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error bypassing video: {e}")
+            return False
+    
+    def bypass_multiple_videos(self, video_paths: List[Path]) -> Dict[str, Any]:
+        """
+        Bypass multiple videos by copying them to output.
+        
+        Args:
+            video_paths: List of video paths to bypass.
+        
+        Returns:
+            Dictionary with success count and failed list.
+        """
+        successful = 0
+        failed = []
+        
+        for video_path in video_paths:
+            if self.bypass_video(video_path):
+                successful += 1
+            else:
+                failed.append(str(video_path))
+        
+        return {
+            'successful': successful,
+            'failed': failed,
+            'total': len(video_paths)
+        }
+    
     def get_file_statistics(self) -> Dict[str, Any]:
         """
         Get statistics about files.

@@ -195,6 +195,53 @@ def api_reset_failed():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/bypass', methods=['POST'])
+def api_bypass():
+    """Bypass a video by copying directly to output."""
+    try:
+        data = request.json
+        video_path = data.get('video_path')
+        
+        if not video_path:
+            return jsonify({'error': 'video_path required'}), 400
+        
+        proc = get_processor()
+        video_path = Path(video_path)
+        
+        success = proc.bypass_video(video_path)
+        
+        return jsonify({
+            'success': success,
+            'message': 'Video bypassed successfully' if success else 'Bypass failed'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bypass-multiple', methods=['POST'])
+def api_bypass_multiple():
+    """Bypass multiple videos by copying to output."""
+    try:
+        data = request.json
+        video_paths = data.get('video_paths', [])
+        
+        if not video_paths:
+            return jsonify({'error': 'video_paths required'}), 400
+        
+        proc = get_processor()
+        paths = [Path(p) for p in video_paths]
+        
+        result = proc.bypass_multiple_videos(paths)
+        
+        return jsonify({
+            'success': True,
+            'result': result,
+            'message': f"Bypassed {result['successful']} of {result['total']} videos"
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/search')
 def api_search():
     """Search for videos by name."""
