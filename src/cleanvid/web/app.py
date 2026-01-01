@@ -180,6 +180,42 @@ def api_process():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/process-all', methods=['POST'])
+def api_process_all():
+    """Process all unprocessed videos."""
+    try:
+        proc = get_processor()
+        
+        # Get unprocessed videos
+        unprocessed = proc.file_manager.get_unprocessed_videos()
+        
+        if len(unprocessed) == 0:
+            return jsonify({
+                'success': True,
+                'message': 'No unprocessed videos found',
+                'stats': {
+                    'total_videos': 0,
+                    'successful': 0,
+                    'failed': 0,
+                    'skipped': 0
+                }
+            })
+        
+        # Process all unprocessed videos
+        stats = proc.process_batch(unprocessed)
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                'total_videos': stats.total_videos,
+                'successful': stats.successful,
+                'failed': stats.failed,
+                'skipped': stats.skipped
+            },
+            'message': f'Processed {stats.total_videos} videos: {stats.successful} successful, {stats.failed} failed'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/reset', methods=['POST'])
 def api_reset():

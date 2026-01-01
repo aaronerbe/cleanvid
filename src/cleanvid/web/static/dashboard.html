@@ -206,10 +206,17 @@
                 </section>
             </div>
 
-            <!-- Process Video Section - WITH BROWSE BUTTON -->
+            <!-- Process Video Section - WITH BROWSE BUTTON AND PROCESS ALL -->
             <section class="mb-8">
-                <h2 class="text-2xl font-bold mb-4">Process Video</h2>
+                <h2 class="text-2xl font-bold mb-4">Process Videos</h2>
                 <div class="bg-white rounded-lg shadow-md p-6">
+                    <!-- Add Process All Button -->
+                    <div class="mb-4 flex justify-between items-center">
+                        <p class="text-gray-600">Process individual videos or run full batch processing</p>
+                        <button onclick="processAll()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                            Process All Unprocessed Videos
+                        </button>
+                    </div>
                     <div class="flex gap-4">
                         <input 
                             type="text" 
@@ -230,6 +237,7 @@
                     </div>
                 </div>
             </section>
+
         </main>
 
         <!-- Footer -->
@@ -560,6 +568,44 @@
                     alert('Error processing video: ' + error.message);
                 }
             }
+            
+            async function processAll() {
+                // Get current unprocessed count
+                const unprocessedCount = document.getElementById('unprocessedVideos').textContent;
+                
+                if (unprocessedCount === '--' || unprocessedCount === '0') {
+                    alert('No unprocessed videos found!');
+                    return;
+                }
+                
+                if (!confirm(`Process ALL ${unprocessedCount} unprocessed videos?\n\nThis will start a full batch processing job. This may take a long time depending on the number of videos.`)) {
+                    return;
+                }
+                
+                try {
+                    // Show processing started
+                    alert('Batch processing started! This will run in the background.\n\nRefresh the dashboard to see progress in Recent Activity.');
+                    
+                    const response = await fetch('/api/process-all', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert(data.message);
+                        refreshStatus();
+                        refreshStatistics();
+                        refreshHistory();
+                    } else {
+                        alert('Error: ' + (data.error || 'Processing failed'));
+                    }
+                } catch (error) {
+                    alert('Error starting batch processing: ' + error.message);
+                }
+            }
+            
             async function resetVideo(videoPath) {
                 if (!confirm(`Reset ${videoPath.split('/').pop()}?\n\nThis will remove it from the failed list so it can be retried in the next batch job.`)) {
                     return;
