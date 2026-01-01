@@ -24,12 +24,18 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 # Create directories for volumes
 RUN mkdir -p /input /output /config /logs
 
+# Create entrypoint wrapper to set umask
+RUN echo '#!/bin/sh' > /entrypoint.sh && \
+    echo 'umask 002' >> /entrypoint.sh && \
+    echo 'exec "$@"' >> /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
 # Expose web dashboard port
 EXPOSE 8080
 
-# Default command
-ENTRYPOINT ["cleanvid"]
+# Use entrypoint wrapper
+ENTRYPOINT ["/entrypoint.sh", "cleanvid"]
 CMD ["--help"]
