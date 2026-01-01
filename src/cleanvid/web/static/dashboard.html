@@ -1,860 +1,886 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cleanvid Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .stat-card {
-            transition: transform 0.2s;
-        }
-        .stat-card:hover {
-            transform: translateY(-2px);
-        }
-        .pulse-green {
-            animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse-green {
-            0%, 100% {
-                opacity: 1;
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Cleanvid Dashboard</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            .stat-card {
+                transition: transform 0.2s;
             }
-            50% {
-                opacity: .5;
+            .stat-card:hover {
+                transform: translateY(-2px);
             }
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 50;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.4);
-        }
-        .modal.show {
-            display: block;
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 5% auto;
-            padding: 0;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 800px;
-            max-height: 80vh;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-    </style>
-</head>
-<body class="bg-gray-100">
-    <!-- Header -->
-    <header class="bg-blue-600 text-white shadow-lg">
-        <div class="container mx-auto px-4 py-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-3xl font-bold">Cleanvid Dashboard</h1>
-                    <p class="text-blue-100">Automated Movie Profanity Filtering</p>
-                </div>
-                <div class="text-right">
-                    <div class="text-sm text-blue-100">Last Updated</div>
-                    <div id="lastUpdate" class="text-lg font-semibold">--:--:--</div>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8">
-        <!-- System Status -->
-        <section class="mb-8">
-            <h2 class="text-2xl font-bold mb-4">System Status</h2>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <!-- Container Status -->
-                <div class="stat-card bg-white rounded-lg shadow-md p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">Container</p>
-                            <p id="containerStatus" class="text-2xl font-bold text-green-600">●</p>
-                        </div>
-                        <svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
-                        </svg>
+            .pulse-green {
+                animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+            @keyframes pulse-green {
+                0%, 100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: .5;
+                }
+            }
+            .modal {
+                display: none;
+                position: fixed;
+                z-index: 50;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                overflow: auto;
+                background-color: rgba(0,0,0,0.4);
+            }
+            .modal.show {
+                display: block;
+            }
+            .modal-content {
+                background-color: #fefefe;
+                margin: 5% auto;
+                padding: 0;
+                border-radius: 8px;
+                width: 90%;
+                max-width: 800px;
+                max-height: 80vh;
+                overflow: hidden;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+        </style>
+    </head>
+    <body class="bg-gray-100">
+        <!-- Header -->
+        <header class="bg-blue-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold">Cleanvid Dashboard</h1>
+                        <p class="text-blue-100">Automated Movie Profanity Filtering</p>
                     </div>
-                </div>
-
-                <!-- FFmpeg Status -->
-                <div class="stat-card bg-white rounded-lg shadow-md p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">FFmpeg</p>
-                            <p id="ffmpegStatus" class="text-lg font-bold">Available</p>
-                        </div>
-                        <svg class="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-
-                <!-- OpenSubtitles Status -->
-                <div class="stat-card bg-white rounded-lg shadow-md p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">OpenSubtitles</p>
-                            <p id="subtitlesStatus" class="text-lg font-bold">Enabled</p>
-                        </div>
-                        <svg class="w-12 h-12 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
-                        </svg>
-                    </div>
-                </div>
-
-                <!-- Profanity Words - CLICKABLE -->
-                <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="openWordListModal()">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">Word List</p>
-                            <p id="wordCount" class="text-2xl font-bold">--</p>
-                            <p class="text-xs text-blue-600 mt-1">Click to edit</p>
-                        </div>
-                        <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                        </svg>
+                    <div class="text-right">
+                        <div class="text-sm text-blue-100">Last Updated</div>
+                        <div id="lastUpdate" class="text-lg font-semibold">--:--:--</div>
                     </div>
                 </div>
             </div>
-        </section>
+        </header>
 
-        <!-- Statistics -->
-        <section class="mb-8">
-            <h2 class="text-2xl font-bold mb-4">Processing Statistics</h2>
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <p class="text-gray-500 text-sm">Total Videos</p>
-                    <p id="totalVideos" class="text-3xl font-bold text-blue-600">--</p>
-                </div>
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <p class="text-gray-500 text-sm">Processed</p>
-                    <p id="processedVideos" class="text-3xl font-bold text-green-600">--</p>
-                </div>
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <p class="text-gray-500 text-sm">Unprocessed</p>
-                    <p id="unprocessedVideos" class="text-3xl font-bold text-yellow-600">--</p>
-                </div>
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <p class="text-gray-500 text-sm">Success Rate</p>
-                    <p id="successRate" class="text-3xl font-bold text-purple-600">--%</p>
-                </div>
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <p class="text-gray-500 text-sm">Library Size</p>
-                    <p id="totalSize" class="text-3xl font-bold text-indigo-600">-- GB</p>
-                </div>
-            </div>
-        </section>
-        <!-- Recent Activity & Failures -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <!-- Recent Activity -->
-            <section>
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold">Recent Activity</h2>
-                    <button onclick="refreshHistory()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                        Refresh
-                    </button>
-                </div>
-                <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                    <div id="recentActivity" class="divide-y max-h-96 overflow-y-auto">
-                        <!-- Will be populated by JavaScript -->
+        <!-- Main Content -->
+        <main class="container mx-auto px-4 py-8">
+            <!-- System Status -->
+            <section class="mb-8">
+                <h2 class="text-2xl font-bold mb-4">System Status</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <!-- Container Status -->
+                    <div class="stat-card bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Container</p>
+                                <p id="containerStatus" class="text-2xl font-bold text-green-600">●</p>
+                            </div>
+                            <svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- FFmpeg Status -->
+                    <div class="stat-card bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">FFmpeg</p>
+                                <p id="ffmpegStatus" class="text-lg font-bold">Available</p>
+                            </div>
+                            <svg class="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- OpenSubtitles Status -->
+                    <div class="stat-card bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">OpenSubtitles</p>
+                                <p id="subtitlesStatus" class="text-lg font-bold">Enabled</p>
+                            </div>
+                            <svg class="w-12 h-12 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Profanity Words - CLICKABLE -->
+                    <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="openWordListModal()">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Word List</p>
+                                <p id="wordCount" class="text-2xl font-bold">--</p>
+                                <p class="text-xs text-blue-600 mt-1">Click to edit</p>
+                            </div>
+                            <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div id="processingStatus" class="stat-card bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Processing</p>
+                                <p id="processingState" class="text-2xl font-bold text-gray-600">Idle</p>
+                            </div>
+                            <svg id="processingIcon" class="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Failed Videos - WITH SELECT BYPASS BUTTON -->
-            <section>
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold">Failed Videos</h2>
-                    <div class="flex gap-2">
-                        <button onclick="openBypassModal()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                            Select Bypass
-                        </button>
-                        <button onclick="resetAllFailed()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">
-                            Reset All Failed
-                        </button>
-                        <button onclick="refreshFailures()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+            <!-- Statistics -->
+            <section class="mb-8">
+                <h2 class="text-2xl font-bold mb-4">Processing Statistics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <p class="text-gray-500 text-sm">Total Videos</p>
+                        <p id="totalVideos" class="text-3xl font-bold text-blue-600">--</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <p class="text-gray-500 text-sm">Processed</p>
+                        <p id="processedVideos" class="text-3xl font-bold text-green-600">--</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <p class="text-gray-500 text-sm">Unprocessed</p>
+                        <p id="unprocessedVideos" class="text-3xl font-bold text-yellow-600">--</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <p class="text-gray-500 text-sm">Success Rate</p>
+                        <p id="successRate" class="text-3xl font-bold text-purple-600">--%</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <p class="text-gray-500 text-sm">Library Size</p>
+                        <p id="totalSize" class="text-3xl font-bold text-indigo-600">-- GB</p>
+                    </div>
+                </div>
+            </section>
+            <!-- Recent Activity & Failures -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- Recent Activity -->
+                <section>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold">Recent Activity</h2>
+                        <button onclick="refreshHistory()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
                             Refresh
                         </button>
                     </div>
-                </div>
-                <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                    <div id="failedVideos" class="divide-y max-h-96 overflow-y-auto">
-                        <!-- Will be populated by JavaScript -->
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                        <div id="recentActivity" class="divide-y max-h-96 overflow-y-auto">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Failed Videos - WITH SELECT BYPASS BUTTON -->
+                <section>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold">Failed Videos</h2>
+                        <div class="flex gap-2">
+                            <button onclick="openBypassModal()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                                Select Bypass
+                            </button>
+                            <button onclick="resetAllFailed()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">
+                                Reset All Failed
+                            </button>
+                            <button onclick="refreshFailures()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                        <div id="failedVideos" class="divide-y max-h-96 overflow-y-auto">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Process Video Section - WITH BROWSE BUTTON -->
+            <section class="mb-8">
+                <h2 class="text-2xl font-bold mb-4">Process Video</h2>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex gap-4">
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="Search for video by name..." 
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            onkeyup="searchVideos()"
+                        />
+                        <button onclick="openBrowseModal()" class="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">
+                            Browse
+                        </button>
+                        <button onclick="processSelected()" class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
+                            Process
+                        </button>
+                    </div>
+                    <div id="searchResults" class="mt-4 max-h-60 overflow-y-auto">
+                        <!-- Search results will appear here -->
                     </div>
                 </div>
             </section>
-        </div>
+        </main>
 
-        <!-- Process Video Section - WITH BROWSE BUTTON -->
-        <section class="mb-8">
-            <h2 class="text-2xl font-bold mb-4">Process Video</h2>
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex gap-4">
-                    <input 
-                        type="text" 
-                        id="searchInput" 
-                        placeholder="Search for video by name..." 
-                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        onkeyup="searchVideos()"
-                    />
-                    <button onclick="openBrowseModal()" class="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">
-                        Browse
-                    </button>
-                    <button onclick="processSelected()" class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
-                        Process
-                    </button>
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white mt-12">
+            <div class="container mx-auto px-4 py-6 text-center">
+                <p>Cleanvid Dashboard v1.0 | <a href="https://github.com" class="text-blue-400 hover:text-blue-300">GitHub</a></p>
+            </div>
+        </footer>
+        <!-- File Browser Modal -->
+        <div id="browseModal" class="modal">
+            <div class="modal-content">
+                <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
+                    <h3 class="text-xl font-bold">Browse Videos</h3>
+                    <button onclick="closeBrowseModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
                 </div>
-                <div id="searchResults" class="mt-4 max-h-60 overflow-y-auto">
-                    <!-- Search results will appear here -->
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-gray-800 text-white mt-12">
-        <div class="container mx-auto px-4 py-6 text-center">
-            <p>Cleanvid Dashboard v1.0 | <a href="https://github.com" class="text-blue-400 hover:text-blue-300">GitHub</a></p>
-        </div>
-    </footer>
-    <!-- File Browser Modal -->
-    <div id="browseModal" class="modal">
-        <div class="modal-content">
-            <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
-                <h3 class="text-xl font-bold">Browse Videos</h3>
-                <button onclick="closeBrowseModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
-            </div>
-            <div class="px-6 py-4">
-                <div id="currentPath" class="text-sm text-gray-600 mb-4"></div>
-                <div id="browseItems" class="max-h-96 overflow-y-auto">
-                    <!-- Browser items will appear here -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Word List Editor Modal -->
-    <div id="wordListModal" class="modal">
-        <div class="modal-content">
-            <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
-                <h3 class="text-xl font-bold">Edit Word List</h3>
-                <button onclick="closeWordListModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
-            </div>
-            <div class="px-6 py-4">
-                <p class="text-sm text-gray-600 mb-4">One word per line. Use * for wildcards (e.g., "sh*t" matches "shoot", "shut", etc.)</p>
-                <textarea 
-                    id="wordListEditor" 
-                    class="w-full h-96 p-4 border border-gray-300 rounded font-mono text-sm"
-                    placeholder="Loading..."
-                ></textarea>
-                <div class="mt-4 flex justify-between items-center">
-                    <span id="wordListCount" class="text-sm text-gray-600">0 words</span>
-                    <div class="flex gap-2">
-                        <button onclick="closeWordListModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
-                            Cancel
-                        </button>
-                        <button onclick="saveWordList()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                            Save Changes
-                        </button>
+                <div class="px-6 py-4">
+                    <div id="currentPath" class="text-sm text-gray-600 mb-4"></div>
+                    <div id="browseItems" class="max-h-96 overflow-y-auto">
+                        <!-- Browser items will appear here -->
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Bypass Selection Modal -->
-    <div id="bypassModal" class="modal">
-        <div class="modal-content">
-            <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
-                <h3 class="text-xl font-bold">Select Videos to Bypass</h3>
-                <button onclick="closeBypassModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
-            </div>
-            <div class="px-6 py-4">
-                <p class="text-sm text-gray-600 mb-4">Select videos to copy directly to output without processing. Useful for children's videos without subtitles or other safe content.</p>
-                <div id="bypassVideoList" class="max-h-96 overflow-y-auto mb-4">
-                    <!-- Checkboxes will appear here -->
+        <!-- Word List Editor Modal -->
+        <div id="wordListModal" class="modal">
+            <div class="modal-content">
+                <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
+                    <h3 class="text-xl font-bold">Edit Word List</h3>
+                    <button onclick="closeWordListModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
                 </div>
-                <div class="flex justify-between items-center border-t pt-4">
-                    <div>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" id="selectAllBypass" onchange="toggleSelectAll()">
-                            <span class="text-sm font-medium">Select All</span>
-                        </label>
-                        <span id="bypassSelectedCount" class="text-sm text-gray-600 ml-6">0 selected</span>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="closeBypassModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
-                            Cancel
-                        </button>
-                        <button onclick="bypassSelected()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                            Bypass Selected
-                        </button>
+                <div class="px-6 py-4">
+                    <p class="text-sm text-gray-600 mb-4">One word per line. Use * for wildcards (e.g., "sh*t" matches "shoot", "shut", etc.)</p>
+                    <textarea 
+                        id="wordListEditor" 
+                        class="w-full h-96 p-4 border border-gray-300 rounded font-mono text-sm"
+                        placeholder="Loading..."
+                    ></textarea>
+                    <div class="mt-4 flex justify-between items-center">
+                        <span id="wordListCount" class="text-sm text-gray-600">0 words</span>
+                        <div class="flex gap-2">
+                            <button onclick="closeWordListModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                                Cancel
+                            </button>
+                            <button onclick="saveWordList()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                Save Changes
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <script>
-        let selectedVideoPath = null;
-        let currentBrowsePath = '';
+        <!-- Bypass Selection Modal -->
+        <div id="bypassModal" class="modal">
+            <div class="modal-content">
+                <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
+                    <h3 class="text-xl font-bold">Select Videos to Bypass</h3>
+                    <button onclick="closeBypassModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
+                </div>
+                <div class="px-6 py-4">
+                    <p class="text-sm text-gray-600 mb-4">Select videos to copy directly to output without processing. Useful for children's videos without subtitles or other safe content.</p>
+                    <div id="bypassVideoList" class="max-h-96 overflow-y-auto mb-4">
+                        <!-- Checkboxes will appear here -->
+                    </div>
+                    <div class="flex justify-between items-center border-t pt-4">
+                        <div>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="selectAllBypass" onchange="toggleSelectAll()">
+                                <span class="text-sm font-medium">Select All</span>
+                            </label>
+                            <span id="bypassSelectedCount" class="text-sm text-gray-600 ml-6">0 selected</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="closeBypassModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                                Cancel
+                            </button>
+                            <button onclick="bypassSelected()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                                Bypass Selected
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-        // Auto-refresh every 10 seconds
-        setInterval(() => {
+        <script>
+            let selectedVideoPath = null;
+            let currentBrowsePath = '';
+
+            // Auto-refresh every 10 seconds
+            setInterval(() => {
+                refreshStatus();
+                refreshStatistics();
+                refreshHistory();
+            }, 10000);
+
+            // Initial load
             refreshStatus();
             refreshStatistics();
             refreshHistory();
-        }, 10000);
-
-        // Initial load
-        refreshStatus();
-        refreshStatistics();
-        refreshHistory();
-        refreshFailures();
-        async function refreshStatus() {
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-                
-                document.getElementById('containerStatus').textContent = '●';
-                document.getElementById('containerStatus').className = 'text-2xl font-bold text-green-600 pulse-green';
-                
-                document.getElementById('ffmpegStatus').textContent = data.ffmpeg_available ? 'Available' : 'Not Available';
-                document.getElementById('subtitlesStatus').textContent = data.opensubtitles_enabled ? 'Enabled' : 'Disabled';
-                document.getElementById('wordCount').textContent = data.profanity_words || '--';
-                
-                document.getElementById('totalVideos').textContent = data.total_videos || '--';
-                document.getElementById('processedVideos').textContent = data.processed_videos || '--';
-                document.getElementById('unprocessedVideos').textContent = data.unprocessed_videos || '--';
-                
-                const now = new Date();
-                document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
-            } catch (error) {
-                console.error('Error fetching status:', error);
-                document.getElementById('containerStatus').className = 'text-2xl font-bold text-red-600';
-            }
-        }
-
-        async function refreshStatistics() {
-            try {
-                const response = await fetch('/api/statistics');
-                const data = await response.json();
-                
-                const fileStats = data.file_stats;
-                const procStats = data.processing_stats;
-                
-                document.getElementById('totalSize').textContent = `${fileStats.total_size_gb.toFixed(1)} GB`;
-                document.getElementById('successRate').textContent = `${procStats.success_rate}%`;
-            } catch (error) {
-                console.error('Error fetching statistics:', error);
-            }
-        }
-
-        async function refreshHistory() {
-            try {
-                const response = await fetch('/api/history?limit=15');
-                const data = await response.json();
-                
-                const container = document.getElementById('recentActivity');
-                container.innerHTML = '';
-                
-                if (data.history.length === 0) {
-                    container.innerHTML = '<p class="p-4 text-gray-500">No processing history yet</p>';
-                    return;
-                }
-                
-                data.history.forEach(entry => {
-                    const div = document.createElement('div');
-                    div.className = 'p-4 hover:bg-gray-50';
-                    
-                    const success = entry.success;
-                    const statusClass = success ? 'text-green-600' : 'text-red-600';
-                    const statusIcon = success ? '✓' : '✗';
-                    
-                    const videoName = entry.video_path.split('/').pop();
-                    const timestamp = new Date(entry.timestamp).toLocaleString();
-                    
-                    div.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="${statusClass} font-bold">${statusIcon}</span>
-                                    <span class="font-medium">${videoName}</span>
-                                </div>
-                                <div class="text-sm text-gray-500 mt-1">${timestamp}</div>
-                                ${entry.segments_muted ? `<div class="text-sm text-blue-600 mt-1">Segments muted: ${entry.segments_muted}</div>` : ''}
-                                ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error.substring(0, 100)}${entry.error.length > 100 ? '...' : ''}</div>` : ''}
-                            </div>
-                        </div>
-                    `;
-                    
-                    container.appendChild(div);
-                });
-            } catch (error) {
-                console.error('Error fetching history:', error);
-            }
-        }
-
-        async function refreshFailures() {
-            try {
-                const response = await fetch('/api/failures');
-                const data = await response.json();
-                
-                const container = document.getElementById('failedVideos');
-                container.innerHTML = '';
-                
-                if (data.failures.length === 0) {
-                    container.innerHTML = '<p class="p-4 text-gray-500">No failures! 🎉</p>';
-                    return;
-                }
-                
-                data.failures.slice(0, 15).forEach(entry => {
-                    const div = document.createElement('div');
-                    div.className = 'p-4 hover:bg-gray-50';
-                    
-                    const videoName = entry.video_path.split('/').pop();
-                    const error = entry.error || 'Unknown error';
-                    const escapedPath = entry.video_path.replace(/'/g, "\\'");
-                    
-                    div.innerHTML = `
-                        <div>
-                            <div class="font-medium text-red-600">${videoName}</div>
-                            <div class="text-sm text-gray-600 mt-1">${error.substring(0, 100)}${error.length > 100 ? '...' : ''}</div>
-                            <div class="mt-2 flex gap-2">
-                                <button 
-                                    onclick="bypassVideo('${escapedPath}')" 
-                                    class="text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                                    title="Copy video directly to output without processing"
-                                >
-                                    Bypass
-                                </button>
-                                <button 
-                                    onclick="resetVideo('${escapedPath}')" 
-                                    class="text-sm px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600"
-                                >
-                                    Reset
-                                </button>
-                                <button 
-                                    onclick="retryVideo('${escapedPath}')" 
-                                    class="text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                >
-                                    Retry
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    container.appendChild(div);
-                });
-            } catch (error) {
-                console.error('Error fetching failures:', error);
-            }
-        }
-
-        let searchTimeout;
-        async function searchVideos() {
-            clearTimeout(searchTimeout);
-            
-            const query = document.getElementById('searchInput').value;
-            if (query.length < 2) {
-                document.getElementById('searchResults').innerHTML = '';
-                return;
-            }
-            
-            searchTimeout = setTimeout(async () => {
+            refreshFailures();
+            async function refreshStatus() {
                 try {
-                    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                    const response = await fetch('/api/status');
                     const data = await response.json();
                     
-                    const container = document.getElementById('searchResults');
+                    // Update last refresh time
+                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                    
+                    // Update status displays
+                    document.getElementById('totalVideos').textContent = data.total_videos || '--';
+                    document.getElementById('processedVideos').textContent = data.processed_videos || '--';
+                    document.getElementById('unprocessedVideos').textContent = data.unprocessed_videos || '--';
+                    document.getElementById('ffmpegStatus').textContent = data.ffmpeg_available ? 'Available' : 'Not Found';
+                    document.getElementById('wordCount').textContent = data.word_count || '--';
+                    
+                    // Check processing status
+                    const procResponse = await fetch('/api/processing-status');
+                    const procData = await procResponse.json();
+                    
+                    const stateElement = document.getElementById('processingState');
+                    const iconElement = document.getElementById('processingIcon');
+                    
+                    if (procData.is_processing) {
+                        stateElement.textContent = 'Active';
+                        stateElement.className = 'text-2xl font-bold text-green-600 pulse-green';
+                        iconElement.className = 'w-12 h-12 text-green-500 animate-spin';
+                        iconElement.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>';
+                    } else {
+                        stateElement.textContent = 'Idle';
+                        stateElement.className = 'text-2xl font-bold text-gray-600';
+                        iconElement.className = 'w-12 h-12 text-gray-500';
+                        iconElement.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+                    }
+                    
+                } catch (error) {
+                    console.error('Error fetching status:', error);
+                }
+            }
+
+            async function refreshStatistics() {
+                try {
+                    const response = await fetch('/api/statistics');
+                    const data = await response.json();
+                    
+                    const fileStats = data.file_stats;
+                    const procStats = data.processing_stats;
+                    
+                    document.getElementById('totalSize').textContent = `${fileStats.total_size_gb.toFixed(1)} GB`;
+                    document.getElementById('successRate').textContent = `${procStats.success_rate}%`;
+                } catch (error) {
+                    console.error('Error fetching statistics:', error);
+                }
+            }
+
+            async function refreshHistory() {
+                try {
+                    const response = await fetch('/api/history?limit=15');
+                    const data = await response.json();
+                    
+                    const container = document.getElementById('recentActivity');
                     container.innerHTML = '';
                     
-                    if (data.matches.length === 0) {
-                        container.innerHTML = '<p class="text-gray-500 p-2">No matches found</p>';
+                    if (data.history.length === 0) {
+                        container.innerHTML = '<p class="p-4 text-gray-500">No processing history yet</p>';
                         return;
                     }
                     
-                    data.matches.forEach(path => {
+                    data.history.forEach(entry => {
                         const div = document.createElement('div');
-                        div.className = 'p-2 hover:bg-blue-50 cursor-pointer rounded';
-                        div.textContent = path.split('/').pop();
-                        div.onclick = () => selectVideo(path);
+                        div.className = 'p-4 hover:bg-gray-50';
+                        
+                        const success = entry.success;
+                        const statusClass = success ? 'text-green-600' : 'text-red-600';
+                        const statusIcon = success ? '✓' : '✗';
+                        
+                        const videoName = entry.video_path.split('/').pop();
+                        const timestamp = new Date(entry.timestamp).toLocaleString();
+                        
+                        div.innerHTML = `
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="${statusClass} font-bold">${statusIcon}</span>
+                                        <span class="font-medium">${videoName}</span>
+                                    </div>
+                                    <div class="text-sm text-gray-500 mt-1">${timestamp}</div>
+                                    ${entry.segments_muted ? `<div class="text-sm text-blue-600 mt-1">Segments muted: ${entry.segments_muted}</div>` : ''}
+                                    ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error.substring(0, 100)}${entry.error.length > 100 ? '...' : ''}</div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                        
                         container.appendChild(div);
                     });
                 } catch (error) {
-                    console.error('Error searching:', error);
+                    console.error('Error fetching history:', error);
                 }
-            }, 300);
-        }
+            }
 
-        function selectVideo(path) {
-            selectedVideoPath = path;
-            document.getElementById('searchInput').value = path.split('/').pop();
-            document.getElementById('searchResults').innerHTML = '';
-        }
+            async function refreshFailures() {
+                try {
+                    const response = await fetch('/api/failures');
+                    const data = await response.json();
+                    
+                    const container = document.getElementById('failedVideos');
+                    container.innerHTML = '';
+                    
+                    if (data.failures.length === 0) {
+                        container.innerHTML = '<p class="p-4 text-gray-500">No failures! 🎉</p>';
+                        return;
+                    }
+                    
+                    data.failures.slice(0, 15).forEach(entry => {
+                        const div = document.createElement('div');
+                        div.className = 'p-4 hover:bg-gray-50';
+                        
+                        const videoName = entry.video_path.split('/').pop();
+                        const error = entry.error || 'Unknown error';
+                        const escapedPath = entry.video_path.replace(/'/g, "\\'");
+                        
+                        div.innerHTML = `
+                            <div>
+                                <div class="font-medium text-red-600">${videoName}</div>
+                                <div class="text-sm text-gray-600 mt-1">${error.substring(0, 100)}${error.length > 100 ? '...' : ''}</div>
+                                <div class="mt-2 flex gap-2">
+                                    <button 
+                                        onclick="bypassVideo('${escapedPath}')" 
+                                        class="text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                                        title="Copy video directly to output without processing"
+                                    >
+                                        Bypass
+                                    </button>
+                                    <button 
+                                        onclick="resetVideo('${escapedPath}')" 
+                                        class="text-sm px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600"
+                                    >
+                                        Reset
+                                    </button>
+                                    <button 
+                                        onclick="retryVideo('${escapedPath}')" 
+                                        class="text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                    >
+                                        Retry
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        container.appendChild(div);
+                    });
+                } catch (error) {
+                    console.error('Error fetching failures:', error);
+                }
+            }
 
-        async function processSelected() {
-            if (!selectedVideoPath) {
-                alert('Please search and select a video first');
-                return;
-            }
-            
-            if (!confirm(`Process ${selectedVideoPath.split('/').pop()}?`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/process', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_path: selectedVideoPath })
-                });
+            let searchTimeout;
+            async function searchVideos() {
+                clearTimeout(searchTimeout);
                 
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('Processing started! Check Recent Activity for updates.');
-                    refreshHistory();
-                    selectedVideoPath = null;
-                    document.getElementById('searchInput').value = '';
-                } else {
-                    alert('Error: ' + (data.error || 'Processing failed'));
-                }
-            } catch (error) {
-                alert('Error processing video: ' + error.message);
-            }
-        }
-        async function resetVideo(videoPath) {
-            if (!confirm(`Reset ${videoPath.split('/').pop()}?\n\nThis will remove it from the failed list so it can be retried in the next batch job.`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/reset', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_path: videoPath })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('Video reset successfully! It will be retried in the next batch job.');
-                    refreshFailures();
-                    refreshStatistics();
-                } else {
-                    alert('Error: ' + (data.message || 'Reset failed'));
-                }
-            } catch (error) {
-                alert('Error resetting video: ' + error.message);
-            }
-        }
-
-        async function retryVideo(videoPath) {
-            if (!confirm(`Retry ${videoPath.split('/').pop()}?`)) {
-                return;
-            }
-            
-            try {
-                await fetch('/api/reset', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_path: videoPath })
-                });
-                
-                const response = await fetch('/api/process', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_path: videoPath })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('Retry started! Check Recent Activity for updates.');
-                    refreshHistory();
-                    refreshFailures();
-                } else {
-                    alert('Error: ' + (data.error || 'Retry failed'));
-                }
-            } catch (error) {
-                alert('Error retrying video: ' + error.message);
-            }
-        }
-
-        async function resetAllFailed() {
-            if (!confirm('Reset ALL failed videos?\n\nThis will remove all failed videos from the processed log so they can be retried in the next batch job.')) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/reset-failed', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert(`Successfully reset ${data.count} failed video(s)!`);
-                    refreshFailures();
-                    refreshStatistics();
-                } else {
-                    alert('Error: ' + (data.message || 'Reset failed'));
-                }
-            } catch (error) {
-                alert('Error resetting failed videos: ' + error.message);
-            }
-        }
-        // Bypass Functions
-        async function bypassVideo(videoPath) {
-            if (!confirm(`Bypass ${videoPath.split('/').pop()}?\n\nThis will copy the video directly to output without processing.`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/bypass', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_path: videoPath })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('Video bypassed successfully!');
-                    refreshFailures();
-                    refreshStatistics();
-                } else {
-                    alert('Error: ' + (data.message || 'Bypass failed'));
-                }
-            } catch (error) {
-                alert('Error bypassing video: ' + error.message);
-            }
-        }
-
-        async function openBypassModal() {
-            document.getElementById('bypassModal').classList.add('show');
-            
-            try {
-                const response = await fetch('/api/failures');
-                const data = await response.json();
-                
-                const container = document.getElementById('bypassVideoList');
-                container.innerHTML = '';
-                
-                if (data.failures.length === 0) {
-                    container.innerHTML = '<p class="text-gray-500 p-4">No failed videos to bypass!</p>';
+                const query = document.getElementById('searchInput').value;
+                if (query.length < 2) {
+                    document.getElementById('searchResults').innerHTML = '';
                     return;
                 }
                 
-                data.failures.forEach(entry => {
-                    const videoName = entry.video_path.split('/').pop();
-                    const div = document.createElement('div');
-                    div.className = 'p-3 border-b hover:bg-gray-50';
-                    
-                    div.innerHTML = `
-                        <label class="flex items-start gap-3 cursor-pointer">
-                            <input 
-                                type="checkbox" 
-                                class="bypass-checkbox mt-1" 
-                                value="${entry.video_path.replace(/"/g, '&quot;')}"
-                                onchange="updateBypassCount()"
-                            >
-                            <div class="flex-1">
-                                <div class="font-medium">${videoName}</div>
-                                <div class="text-sm text-gray-600 mt-1">${(entry.error || 'Unknown error').substring(0, 100)}</div>
-                            </div>
-                        </label>
-                    `;
-                    
-                    container.appendChild(div);
-                });
-                
-                updateBypassCount();
-            } catch (error) {
-                console.error('Error loading failed videos:', error);
-                alert('Error loading failed videos: ' + error.message);
+                searchTimeout = setTimeout(async () => {
+                    try {
+                        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                        const data = await response.json();
+                        
+                        const container = document.getElementById('searchResults');
+                        container.innerHTML = '';
+                        
+                        if (data.matches.length === 0) {
+                            container.innerHTML = '<p class="text-gray-500 p-2">No matches found</p>';
+                            return;
+                        }
+                        
+                        data.matches.forEach(path => {
+                            const div = document.createElement('div');
+                            div.className = 'p-2 hover:bg-blue-50 cursor-pointer rounded';
+                            div.textContent = path.split('/').pop();
+                            div.onclick = () => selectVideo(path);
+                            container.appendChild(div);
+                        });
+                    } catch (error) {
+                        console.error('Error searching:', error);
+                    }
+                }, 300);
             }
-        }
 
-        function closeBypassModal() {
-            document.getElementById('bypassModal').classList.remove('show');
-        }
-
-        function toggleSelectAll() {
-            const selectAll = document.getElementById('selectAllBypass').checked;
-            document.querySelectorAll('.bypass-checkbox').forEach(cb => {
-                cb.checked = selectAll;
-            });
-            updateBypassCount();
-        }
-
-        function updateBypassCount() {
-            const count = document.querySelectorAll('.bypass-checkbox:checked').length;
-            document.getElementById('bypassSelectedCount').textContent = `${count} selected`;
-        }
-
-        async function bypassSelected() {
-            const checkboxes = document.querySelectorAll('.bypass-checkbox:checked');
-            
-            if (checkboxes.length === 0) {
-                alert('Please select at least one video to bypass');
-                return;
+            function selectVideo(path) {
+                selectedVideoPath = path;
+                document.getElementById('searchInput').value = path.split('/').pop();
+                document.getElementById('searchResults').innerHTML = '';
             }
-            
-            const paths = Array.from(checkboxes).map(cb => cb.value);
-            
-            if (!confirm(`Bypass ${paths.length} video(s)?\n\nThese videos will be copied directly to output without processing.`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/bypass-multiple', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_paths: paths })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert(data.message);
-                    closeBypassModal();
-                    refreshFailures();
-                    refreshStatistics();
-                } else {
-                    alert('Error: ' + (data.message || 'Bypass failed'));
+
+            async function processSelected() {
+                if (!selectedVideoPath) {
+                    alert('Please search and select a video first');
+                    return;
                 }
-            } catch (error) {
-                alert('Error bypassing videos: ' + error.message);
-            }
-        }
-        // File Browser Functions
-        async function openBrowseModal() {
-            document.getElementById('browseModal').classList.add('show');
-            await loadBrowseDirectory('');
-        }
-
-        function closeBrowseModal() {
-            document.getElementById('browseModal').classList.remove('show');
-        }
-
-        async function loadBrowseDirectory(path) {
-            try {
-                currentBrowsePath = path;
-                const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
-                const data = await response.json();
                 
-                document.getElementById('currentPath').textContent = data.current_path;
+                if (!confirm(`Process ${selectedVideoPath.split('/').pop()}?`)) {
+                    return;
+                }
                 
-                const container = document.getElementById('browseItems');
-                container.innerHTML = '';
-                
-                data.items.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'p-3 hover:bg-blue-50 cursor-pointer rounded border-b flex items-center gap-3';
+                try {
+                    const response = await fetch('/api/process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ video_path: selectedVideoPath })
+                    });
                     
-                    if (item.type === 'directory') {
-                        div.innerHTML = `
-                            <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                            </svg>
-                            <span class="flex-1 font-medium">${item.name}</span>
-                        `;
-                        div.onclick = () => loadBrowseDirectory(item.path);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('Processing started! Check Recent Activity for updates.');
+                        refreshHistory();
+                        selectedVideoPath = null;
+                        document.getElementById('searchInput').value = '';
                     } else {
-                        const sizeGB = (item.size / (1024 ** 3)).toFixed(2);
-                        div.innerHTML = `
-                            <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
-                            </svg>
-                            <span class="flex-1">${item.name}</span>
-                            <span class="text-sm text-gray-500">${sizeGB} GB</span>
-                        `;
-                        div.onclick = () => {
-                            selectVideo(item.path);
-                            closeBrowseModal();
-                        };
+                        alert('Error: ' + (data.error || 'Processing failed'));
+                    }
+                } catch (error) {
+                    alert('Error processing video: ' + error.message);
+                }
+            }
+            async function resetVideo(videoPath) {
+                if (!confirm(`Reset ${videoPath.split('/').pop()}?\n\nThis will remove it from the failed list so it can be retried in the next batch job.`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/reset', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ video_path: videoPath })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('Video reset successfully! It will be retried in the next batch job.');
+                        refreshFailures();
+                        refreshStatistics();
+                    } else {
+                        alert('Error: ' + (data.message || 'Reset failed'));
+                    }
+                } catch (error) {
+                    alert('Error resetting video: ' + error.message);
+                }
+            }
+
+            async function retryVideo(videoPath) {
+                if (!confirm(`Retry ${videoPath.split('/').pop()}?`)) {
+                    return;
+                }
+                
+                try {
+                    await fetch('/api/reset', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ video_path: videoPath })
+                    });
+                    
+                    const response = await fetch('/api/process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ video_path: videoPath })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('Retry started! Check Recent Activity for updates.');
+                        refreshHistory();
+                        refreshFailures();
+                    } else {
+                        alert('Error: ' + (data.error || 'Retry failed'));
+                    }
+                } catch (error) {
+                    alert('Error retrying video: ' + error.message);
+                }
+            }
+
+            async function resetAllFailed() {
+                if (!confirm('Reset ALL failed videos?\n\nThis will remove all failed videos from the processed log so they can be retried in the next batch job.')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/reset-failed', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert(`Successfully reset ${data.count} failed video(s)!`);
+                        refreshFailures();
+                        refreshStatistics();
+                    } else {
+                        alert('Error: ' + (data.message || 'Reset failed'));
+                    }
+                } catch (error) {
+                    alert('Error resetting failed videos: ' + error.message);
+                }
+            }
+            // Bypass Functions
+            async function bypassVideo(videoPath) {
+                if (!confirm(`Bypass ${videoPath.split('/').pop()}?\n\nThis will copy the video directly to output without processing.`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/bypass', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ video_path: videoPath })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('Video bypassed successfully!');
+                        refreshFailures();
+                        refreshStatistics();
+                    } else {
+                        alert('Error: ' + (data.message || 'Bypass failed'));
+                    }
+                } catch (error) {
+                    alert('Error bypassing video: ' + error.message);
+                }
+            }
+
+            async function openBypassModal() {
+                document.getElementById('bypassModal').classList.add('show');
+                
+                try {
+                    const response = await fetch('/api/failures');
+                    const data = await response.json();
+                    
+                    const container = document.getElementById('bypassVideoList');
+                    container.innerHTML = '';
+                    
+                    if (data.failures.length === 0) {
+                        container.innerHTML = '<p class="text-gray-500 p-4">No failed videos to bypass!</p>';
+                        return;
                     }
                     
-                    container.appendChild(div);
-                });
-            } catch (error) {
-                console.error('Error loading directory:', error);
-                alert('Error loading directory: ' + error.message);
-            }
-        }
-
-        // Word List Editor Functions
-        async function openWordListModal() {
-            document.getElementById('wordListModal').classList.add('show');
-            
-            try {
-                const response = await fetch('/api/wordlist');
-                const data = await response.json();
-                
-                const editor = document.getElementById('wordListEditor');
-                editor.value = data.words.join('\n');
-                updateWordListCount();
-            } catch (error) {
-                console.error('Error loading word list:', error);
-                alert('Error loading word list: ' + error.message);
-            }
-        }
-
-        function closeWordListModal() {
-            document.getElementById('wordListModal').classList.remove('show');
-        }
-
-        function updateWordListCount() {
-            const editor = document.getElementById('wordListEditor');
-            const words = editor.value.split('\n').filter(line => line.trim() && !line.startsWith('#'));
-            document.getElementById('wordListCount').textContent = `${words.length} words`;
-        }
-
-        document.getElementById('wordListEditor').addEventListener('input', updateWordListCount);
-
-        async function saveWordList() {
-            const editor = document.getElementById('wordListEditor');
-            const words = editor.value.split('\n')
-                .map(line => line.trim())
-                .filter(line => line && !line.startsWith('#'));
-            
-            if (!confirm(`Save ${words.length} words to the profanity list?`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/wordlist', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ words })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert(`Word list updated successfully! ${data.count} words saved.`);
-                    closeWordListModal();
-                    refreshStatus();
-                } else {
-                    alert('Error: ' + (data.message || 'Save failed'));
+                    data.failures.forEach(entry => {
+                        const videoName = entry.video_path.split('/').pop();
+                        const div = document.createElement('div');
+                        div.className = 'p-3 border-b hover:bg-gray-50';
+                        
+                        div.innerHTML = `
+                            <label class="flex items-start gap-3 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    class="bypass-checkbox mt-1" 
+                                    value="${entry.video_path.replace(/"/g, '&quot;')}"
+                                    onchange="updateBypassCount()"
+                                >
+                                <div class="flex-1">
+                                    <div class="font-medium">${videoName}</div>
+                                    <div class="text-sm text-gray-600 mt-1">${(entry.error || 'Unknown error').substring(0, 100)}</div>
+                                </div>
+                            </label>
+                        `;
+                        
+                        container.appendChild(div);
+                    });
+                    
+                    updateBypassCount();
+                } catch (error) {
+                    console.error('Error loading failed videos:', error);
+                    alert('Error loading failed videos: ' + error.message);
                 }
-            } catch (error) {
-                alert('Error saving word list: ' + error.message);
             }
-        }
-    </script>
-</body>
+
+            function closeBypassModal() {
+                document.getElementById('bypassModal').classList.remove('show');
+            }
+
+            function toggleSelectAll() {
+                const selectAll = document.getElementById('selectAllBypass').checked;
+                document.querySelectorAll('.bypass-checkbox').forEach(cb => {
+                    cb.checked = selectAll;
+                });
+                updateBypassCount();
+            }
+
+            function updateBypassCount() {
+                const count = document.querySelectorAll('.bypass-checkbox:checked').length;
+                document.getElementById('bypassSelectedCount').textContent = `${count} selected`;
+            }
+
+            async function bypassSelected() {
+                const checkboxes = document.querySelectorAll('.bypass-checkbox:checked');
+                
+                if (checkboxes.length === 0) {
+                    alert('Please select at least one video to bypass');
+                    return;
+                }
+                
+                const paths = Array.from(checkboxes).map(cb => cb.value);
+                
+                if (!confirm(`Bypass ${paths.length} video(s)?\n\nThese videos will be copied directly to output without processing.`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/bypass-multiple', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ video_paths: paths })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert(data.message);
+                        closeBypassModal();
+                        refreshFailures();
+                        refreshStatistics();
+                    } else {
+                        alert('Error: ' + (data.message || 'Bypass failed'));
+                    }
+                } catch (error) {
+                    alert('Error bypassing videos: ' + error.message);
+                }
+            }
+            // File Browser Functions
+            async function openBrowseModal() {
+                document.getElementById('browseModal').classList.add('show');
+                await loadBrowseDirectory('');
+            }
+
+            function closeBrowseModal() {
+                document.getElementById('browseModal').classList.remove('show');
+            }
+
+            async function loadBrowseDirectory(path) {
+                try {
+                    currentBrowsePath = path;
+                    const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+                    const data = await response.json();
+                    
+                    document.getElementById('currentPath').textContent = data.current_path;
+                    
+                    const container = document.getElementById('browseItems');
+                    container.innerHTML = '';
+                    
+                    data.items.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'p-3 hover:bg-blue-50 cursor-pointer rounded border-b flex items-center gap-3';
+                        
+                        if (item.type === 'directory') {
+                            div.innerHTML = `
+                                <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                                </svg>
+                                <span class="flex-1 font-medium">${item.name}</span>
+                            `;
+                            div.onclick = () => loadBrowseDirectory(item.path);
+                        } else {
+                            const sizeGB = (item.size / (1024 ** 3)).toFixed(2);
+                            div.innerHTML = `
+                                <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                                </svg>
+                                <span class="flex-1">${item.name}</span>
+                                <span class="text-sm text-gray-500">${sizeGB} GB</span>
+                            `;
+                            div.onclick = () => {
+                                selectVideo(item.path);
+                                closeBrowseModal();
+                            };
+                        }
+                        
+                        container.appendChild(div);
+                    });
+                } catch (error) {
+                    console.error('Error loading directory:', error);
+                    alert('Error loading directory: ' + error.message);
+                }
+            }
+
+            // Word List Editor Functions
+            async function openWordListModal() {
+                document.getElementById('wordListModal').classList.add('show');
+                
+                try {
+                    const response = await fetch('/api/wordlist');
+                    const data = await response.json();
+                    
+                    const editor = document.getElementById('wordListEditor');
+                    editor.value = data.words.join('\n');
+                    updateWordListCount();
+                } catch (error) {
+                    console.error('Error loading word list:', error);
+                    alert('Error loading word list: ' + error.message);
+                }
+            }
+
+            function closeWordListModal() {
+                document.getElementById('wordListModal').classList.remove('show');
+            }
+
+            function updateWordListCount() {
+                const editor = document.getElementById('wordListEditor');
+                const words = editor.value.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+                document.getElementById('wordListCount').textContent = `${words.length} words`;
+            }
+
+            document.getElementById('wordListEditor').addEventListener('input', updateWordListCount);
+
+            async function saveWordList() {
+                const editor = document.getElementById('wordListEditor');
+                const words = editor.value.split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line && !line.startsWith('#'));
+                
+                if (!confirm(`Save ${words.length} words to the profanity list?`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/wordlist', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ words })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert(`Word list updated successfully! ${data.count} words saved.`);
+                        closeWordListModal();
+                        refreshStatus();
+                    } else {
+                        alert('Error: ' + (data.message || 'Save failed'));
+                    }
+                } catch (error) {
+                    alert('Error saving word list: ' + error.message);
+                }
+            }
+        </script>
+    </body>
 </html>

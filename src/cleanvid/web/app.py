@@ -122,6 +122,31 @@ def api_statistics():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/processing-status')
+def api_processing_status():
+    """Get current processing/task status."""
+    try:
+        proc = get_processor()
+        recent_history = proc.get_recent_history(limit=1)
+        
+        # Check if last processing was within last 5 minutes
+        if recent_history:
+            last_entry = recent_history[0]
+            last_time = datetime.fromisoformat(last_entry['timestamp'])
+            time_diff = (datetime.now() - last_time).total_seconds()
+            
+            is_processing = time_diff < 300  # 5 minutes
+            last_processed = recent_history[0]
+        else:
+            is_processing = False
+            last_processed = None
+        
+        return jsonify({
+            'is_processing': is_processing,
+            'last_processed': last_processed
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/process', methods=['POST'])
 def api_process():
