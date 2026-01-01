@@ -72,12 +72,9 @@ def api_failures():
     """Get failed videos only."""
     try:
         proc = get_processor()
-        history = proc.get_recent_history(limit=100)
         
-        failures = [
-            entry for entry in history
-            if not entry.get('success', False)
-        ]
+        # Get failed videos directly from file manager (gets ALL failed, not just recent 100)
+        failures = proc.get_failed_videos()
         
         # Group by error type
         error_groups = {}
@@ -129,13 +126,13 @@ def api_processing_status():
         proc = get_processor()
         recent_history = proc.get_recent_history(limit=1)
         
-        # Check if last processing was within last 5 minutes
+        # Check if last processing was within last 90 seconds (more accurate)
         if recent_history:
             last_entry = recent_history[0]
             last_time = datetime.fromisoformat(last_entry['timestamp'])
             time_diff = (datetime.now() - last_time).total_seconds()
             
-            is_processing = time_diff < 300  # 5 minutes
+            is_processing = time_diff < 90  # 90 seconds - more accurate than 5 minutes
             last_processed = recent_history[0]
         else:
             is_processing = False
