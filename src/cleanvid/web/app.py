@@ -186,10 +186,10 @@ def api_process_all():
     try:
         proc = get_processor()
         
-        # Get unprocessed videos
-        unprocessed = proc.file_manager.get_unprocessed_videos()
+        # Get count of unprocessed videos
+        unprocessed_count = len(proc.file_manager.get_unprocessed_videos())
         
-        if len(unprocessed) == 0:
+        if unprocessed_count == 0:
             return jsonify({
                 'success': True,
                 'message': 'No unprocessed videos found',
@@ -202,7 +202,7 @@ def api_process_all():
             })
         
         # Process all unprocessed videos
-        stats = proc.process_batch(unprocessed)
+        stats = proc.process_batch(max_videos=unprocessed_count)
         
         return jsonify({
             'success': True,

@@ -228,8 +228,15 @@ class SubtitleManager:
             return None
         
         except Exception as e:
-            # Log error but don't crash
-            print(f"Failed to download subtitles for {video_path}: {e}")
+            # Check for rate limiting
+            error_msg = str(e).lower()
+            if 'rate' in error_msg or 'limit' in error_msg or '429' in error_msg or 'too many' in error_msg:
+                print(f"⚠️  OpenSubtitles RATE LIMIT reached")
+                print(f"   Free accounts: 20 downloads per 24 hours")
+                print(f"   Consider: VIP account ($10/year) for unlimited downloads")
+                print(f"   Or wait 24 hours before processing more videos")
+            else:
+                print(f"Failed to download subtitles for {video_path}: {e}")
             return None
     
     def get_or_download_subtitle(

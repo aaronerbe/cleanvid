@@ -363,6 +363,7 @@ class FileManager:
     def reset_failed_videos(self) -> int:
         """
         Reset all failed videos so they can be reprocessed.
+        Creates automatic backup before modifying the log.
         
         Returns:
             Number of failed videos that were reset.
@@ -373,6 +374,18 @@ class FileManager:
         try:
             with open(self.processed_log_path, 'r', encoding='utf-8') as f:
                 entries = json.load(f)
+            
+            # Create backup before modifying
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_path = self.processed_log_path.parent / f"processed_log.json.backup.{timestamp}"
+            
+            try:
+                with open(backup_path, 'w', encoding='utf-8') as f:
+                    json.dump(entries, f, indent=2)
+                print(f"✓ Backup created: {backup_path.name}")
+            except Exception as e:
+                print(f"Warning: Failed to create backup: {e}")
+                # Continue anyway - better to reset than to fail completely
             
             # Separate failed and successful entries
             failed_entries = [e for e in entries if not e.get('success', True)]
