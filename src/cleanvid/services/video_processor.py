@@ -152,8 +152,8 @@ class VideoProcessor:
                     
                     video_filters = scene_mgr.get_video_filters(str(video_path))
                     
-                    if video_filters and video_filters.zone_count > 0:
-                        print(f"  Found {video_filters.zone_count} scene skip zone(s)")
+                    if video_filters and len(video_filters.skip_zones) > 0:
+                        print(f"  Found {len(video_filters.skip_zones)} scene skip zone(s)")
                         
                         # Extract zones by type
                         blur_zones = video_filters.get_zones_by_mode(ProcessingMode.BLUR)
@@ -168,7 +168,7 @@ class VideoProcessor:
                         
                         # Extract scene mute time ranges and convert to MuteSegment objects
                         if scene_mute_zones:
-                            scene_mute_ranges = scene_proc.get_mute_time_ranges(scene_mute_zones)
+                            scene_mute_ranges = scene_proc.get_mute_segments(scene_mute_zones)
                             scene_mute_segments = [
                                 MuteSegment(
                                     start_time=start,
@@ -296,8 +296,11 @@ class VideoProcessor:
                 '-threads', str(self.ffmpeg_config.threads),
             ]
             
-            # Add video filter
-            cmd.extend(['-filter_complex', video_filter_complex])
+            # Add video filter with proper formatting
+            # scene_proc returns just the filter (e.g., "boxblur=20:20:enable='...'") 
+            # We need to wrap it as: [0:v]filter[v]
+            filter_with_labels = f"[0:v]{video_filter_complex}[v]"
+            cmd.extend(['-filter_complex', filter_with_labels])
             
             # Map filtered video
             cmd.extend(['-map', '[v]'])

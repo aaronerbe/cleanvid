@@ -394,27 +394,54 @@
             }
         }
 
+        // Processing lock to prevent double-clicks
+        let isProcessing = false;
+
         // Save and process now
         async function saveAndProcessNow() {
-            if (await saveFilters()) {
-                try {
-                    const response = await fetch('/api/process', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            video_path: currentVideo
-                        })
-                    });
-                    
-                    const data = await response.json();
-                    if (data.success) {
-                        alert('Processing started!');
-                    } else {
-                        alert('Processing failed: ' + (data.error || 'Unknown error'));
+            if (isProcessing) {
+                console.log('Already processing, ignoring duplicate click');
+                return;
+            }
+            
+            isProcessing = true;
+            console.log('Save & Process Now clicked');
+            console.log('Current video:', currentVideo);
+            console.log('Skip zones:', skipZones);
+            
+            try {
+                if (await saveFilters()) {
+                    try {
+                        console.log('Filters saved, starting processing...');
+                        const response = await fetch('/api/process', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                video_path: currentVideo
+                            })
+                        });
+                        
+                        console.log('Process API response status:', response.status);
+                        const data = await response.json();
+                        console.log('Process API response data:', data);
+                        
+                        if (data.success) {
+                            alert('Processing started! Check the dashboard for progress.');
+                        } else {
+                            alert('Processing failed: ' + (data.error || 'Unknown error'));
+                        }
+                    } catch (error) {
+                        console.error('Error in saveAndProcessNow:', error);
+                        alert('Error starting processing: ' + error.message);
                     }
-                } catch (error) {
-                    alert('Error starting processing: ' + error.message);
+                } else {
+                    console.log('Save filters failed, not processing');
                 }
+            } finally {
+                // Re-enable processing after 2 seconds
+                setTimeout(() => {
+                    isProcessing = false;
+                }, 2000);
             }
         }
 
