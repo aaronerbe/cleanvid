@@ -49,8 +49,9 @@ class SceneProcessor:
         # boxblur syntax: boxblur=luma_radius:luma_power[:chroma_radius:chroma_power]
         # luma_radius: blur radius (higher = more blur, typical range 2-50)
         # luma_power: how many times to apply (1-10, higher = slower but stronger)
+        # Using power=2 for minimum effective blur (fastest)
         # Also blur chroma (color) channels for better effect
-        return f"boxblur=luma_radius=25:luma_power=3:chroma_radius=25:chroma_power=3:enable='{enable_expr}'"
+        return f"boxblur=luma_radius=25:luma_power=2:chroma_radius=25:chroma_power=2:enable='{enable_expr}'"
     
     def generate_black_filter(self, zones: List[SkipZone]) -> str:
         """
