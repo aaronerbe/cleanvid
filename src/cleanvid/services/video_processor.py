@@ -141,7 +141,11 @@ class VideoProcessor:
             video_filter_complex = None
             scene_zones_applied = 0
             
+            print(f"  🔍 DEBUG: Checking for scene filters...")
+            print(f"  🔍 DEBUG: config_dir = {self.config_dir}")
+            
             if self.config_dir:
+                print(f"  🔍 DEBUG: config_dir exists, attempting to load scene filters")
                 try:
                     from cleanvid.services.scene_manager import SceneManager
                     from cleanvid.services.scene_processor import SceneProcessor
@@ -150,21 +154,27 @@ class VideoProcessor:
                     scene_mgr = SceneManager(self.config_dir)
                     scene_proc = SceneProcessor()
                     
+                    print(f"  🔍 DEBUG: Looking for filters for video: {str(video_path)}")
                     video_filters = scene_mgr.get_video_filters(str(video_path))
+                    print(f"  🔍 DEBUG: video_filters = {video_filters}")
                     
                     if video_filters and len(video_filters.skip_zones) > 0:
-                        print(f"  Found {len(video_filters.skip_zones)} scene skip zone(s)")
+                        print(f"  ✅ Found {len(video_filters.skip_zones)} scene skip zone(s)")
+                        print(f"  🔍 DEBUG: Skip zones: {[{'desc': z.description, 'mode': z.mode.value, 'start': z.start_time, 'end': z.end_time} for z in video_filters.skip_zones]}")
                         
                         # Extract zones by type
                         blur_zones = video_filters.get_zones_by_mode(ProcessingMode.BLUR)
                         black_zones = video_filters.get_zones_by_mode(ProcessingMode.BLACK)
                         scene_mute_zones = video_filters.get_mute_zones()
                         
+                        print(f"  🔍 DEBUG: Blur zones: {len(blur_zones)}, Black zones: {len(black_zones)}, Mute zones: {len(scene_mute_zones)}")
+                        
                         # Generate video filter string for blur/black effects
                         if blur_zones or black_zones:
                             video_filter_complex = scene_proc.combine_video_filters(blur_zones, black_zones)
                             scene_zones_applied += len(blur_zones) + len(black_zones)
-                            print(f"  Applying video filters: {len(blur_zones)} blur, {len(black_zones)} black")
+                            print(f"  ✅ Applying video filters: {len(blur_zones)} blur, {len(black_zones)} black")
+                            print(f"  🔍 DEBUG: Generated filter: {video_filter_complex}")
                         
                         # Extract scene mute time ranges and convert to MuteSegment objects
                         if scene_mute_zones:
@@ -181,11 +191,17 @@ class VideoProcessor:
                             
                             # Merge scene mute segments with profanity segments
                             segments = segments + scene_mute_segments
-                            print(f"  Adding {len(scene_mute_segments)} scene mute zone(s)")
+                            print(f"  ✅ Adding {len(scene_mute_segments)} scene mute zone(s)")
+                    else:
+                        print(f"  ℹ️  No scene filters found for this video")
                         
                 except Exception as e:
-                    print(f"  Warning: Failed to load scene filters: {e}")
+                    print(f"  ⚠️  Warning: Failed to load scene filters: {e}")
+                    import traceback
+                    traceback.print_exc()
                     result.add_warning(f"Scene filters not applied: {e}")
+            else:
+                print(f"  ℹ️  config_dir is None, skipping scene filter loading")
             
             if len(segments) == 0 and not video_filter_complex:
                 # No profanity detected AND no scene filters - copy clean video to output
@@ -302,6 +318,8 @@ class VideoProcessor:
             filter_with_labels = f"[0:v]{video_filter_complex}[v]"
             cmd.extend(['-filter_complex', filter_with_labels])
             
+            print(f"  🔍 DEBUG: Video filter with labels: {filter_with_labels}")
+            
             # Map filtered video
             cmd.extend(['-map', '[v]'])
             
@@ -322,7 +340,9 @@ class VideoProcessor:
             cmd.extend(['-y', str(output_path)])  # -y to overwrite
             
             print(f"  Running FFmpeg with scene filters...")
-            print(f"  Command: ffmpeg -i ... -filter_complex '{video_filter_complex}' ...")
+            print(f"  🔍 DEBUG: Full FFmpeg command:")
+            print(f"  {' '.join(cmd)}")
+            print(f"")
             
             # Run FFmpeg
             result = subprocess.run(

@@ -53,7 +53,8 @@ class Processor:
         self.video_processor = VideoProcessor(
             subtitle_manager=self.subtitle_manager,
             profanity_detector=self.profanity_detector,
-            ffmpeg_config=self.settings.ffmpeg
+            ffmpeg_config=self.settings.ffmpeg,
+            config_dir=self.settings.paths.config_dir
         )
 
     def process_batch(
@@ -397,7 +398,8 @@ class Processor:
         self.video_processor = VideoProcessor(
             subtitle_manager=self.subtitle_manager,
             profanity_detector=self.profanity_detector,
-            ffmpeg_config=self.settings.ffmpeg
+            ffmpeg_config=self.settings.ffmpeg,
+            config_dir=self.settings.paths.config_dir
         )
 
     def __repr__(self) -> str:
