@@ -445,6 +445,311 @@ def api_update_wordlist():
         return jsonify({'error': str(e)}), 500
 
 
+# Scene Editor API Endpoints
+
+@app.route('/scene_editor.html')
+def scene_editor():
+    """Serve the scene editor HTML."""
+    return send_from_directory('static', 'scene_editor.html')
+
+
+@app.route('/api/scene-filters')
+def api_get_all_scene_filters():
+    """Get all scene filters."""
+    try:
+        from cleanvid.services.scene_manager import SceneManager
+        
+        proc = get_processor()
+        scene_mgr = SceneManager(proc.settings.paths.config_dir)
+        
+        filters = scene_mgr.load_scene_filters()
+        stats = scene_mgr.get_filter_statistics()
+        
+        # Convert to dict for JSON
+        filters_dict = {}
+        for video_path, video_filters in filters.items():
+            filters_dict[video_path] = video_filters.to_dict()
+        
+        return jsonify({
+            'filters': filters_dict,
+            'statistics': stats
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scene-filters/<path:video_path>')
+def api_get_video_scene_filters(video_path):
+    """Get scene filters for a specific video."""
+    try:
+        from cleanvid.services.scene_manager import SceneManager
+        
+        proc = get_processor()
+        scene_mgr = SceneManager(proc.settings.paths.config_dir)
+        
+        # Decode path
+        video_path = '/' + video_path
+        
+        filters = scene_mgr.get_video_filters(video_path)
+        
+        if filters is None:
+            return jsonify({
+                'video_path': video_path,
+                'skip_zones': [],
+                'zone_count': 0
+            })
+        
+        return jsonify(filters.to_dict())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scene-filters/<path:video_path>', methods=['POST'])
+def api_save_video_scene_filters(video_path):
+    """Save/update scene filters for a video."""
+    try:
+        from cleanvid.services.scene_manager import SceneManager
+        from cleanvid.models.scene import SkipZone, parse_timestamp
+        
+        data = request.json
+        skip_zones_data = data.get('skip_zones', [])
+        
+        proc = get_processor()
+        scene_mgr = SceneManager(proc.settings.paths.config_dir)
+        
+        # Decode path
+        video_path = '/' + video_path
+        
+        # Load existing filters
+        filters = scene_mgr.load_scene_filters()
+        
+        # Parse skip zones from request
+        skip_zones = []
+        for zone_data in skip_zones_data:
+            try:
+                # Handle timestamp formats
+                if 'start_time' in zone_data:
+                    start_time = float(zone_data['start_time'])
+                else:
+                    start_time = parse_timestamp(zone_data['start_display'])
+                
+                if 'end_time' in zone_data:
+                    end_time = float(zone_data['end_time'])
+                else:
+                    end_time = parse_timestamp(zone_data['end_display'])
+                
+                zone = SkipZone(
+                    id=zone_data.get('id'),
+                    start_time=start_time,
+                    end_time=end_time,
+                    description=zone_data.get('description', ''),
+                    mode=zone_data.get('mode', 'skip'),
+                    mute=zone_data.get('mute', False)
+                )
+                skip_zones.append(zone)
+            except Exception as e:
+                return jsonify({'error': f'Invalid skip zone data: {e}'}), 400
+        
+        # Create or update video filters
+        from cleanvid.models.scene import VideoSceneFilters
+        video_filters = VideoSceneFilters(
+            video_path=video_path,
+            title=data.get('title', ''),
+            skip_zones=skip_zones
+        )
+        
+        filters[video_path] = video_filters
+        
+        # Save
+        if scene_mgr.save_scene_filters(filters):
+            return jsonify({
+                'success': True,
+                'message': f'Saved {len(skip_zones)} skip zone(s)',
+                'filters': video_filters.to_dict()
+            })
+        else:
+            return jsonify({'error': 'Failed to save filters'}), 500
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scene-filters/<path:video_path>', methods=['DELETE'])
+def api_delete_video_scene_filters(video_path):
+    """Delete all scene filters for a video."""
+    try:
+        from cleanvid.services.scene_manager import SceneManager
+        
+        proc = get_processor()
+        scene_mgr = SceneManager(proc.settings.paths.config_dir)
+        
+        # Decode path
+        video_path = '/' + video_path
+        
+        if scene_mgr.delete_video_filters(video_path):
+            return jsonify({
+                'success': True,
+                'message': 'Filters deleted'
+            })
+        else:
+            return jsonify({'error': 'No filters found for video'}), 404
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scene-filters/<path:video_path>/<zone_id>', methods=['DELETE'])
+def api_delete_skip_zone(video_path, zone_id):
+    """Delete a specific skip zone."""
+    try:
+        from cleanvid.services.scene_manager import SceneManager
+        
+        proc = get_processor()
+        scene_mgr = SceneManager(proc.settings.paths.config_dir)
+        
+        # Decode path
+        video_path = '/' + video_path
+        
+        if scene_mgr.delete_skip_zone(video_path, zone_id):
+            return jsonify({
+                'success': True,
+                'message': 'Skip zone deleted'
+            })
+        else:
+            return jsonify({'error': 'Skip zone not found'}), 404
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Queue API Endpoints
+
+@app.route('/api/scene-queue')
+def api_get_scene_queue():
+    """Get scene processing queue."""
+    try:
+        from cleanvid.services.queue_manager import QueueManager
+        
+        proc = get_processor()
+        queue_mgr = QueueManager(proc.settings.paths.config_dir)
+        
+        queue = queue_mgr.get_queue()
+        
+        return jsonify({
+            'queue': queue,
+            'size': len(queue)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scene-queue', methods=['POST'])
+def api_add_to_scene_queue():
+    """Add video to scene processing queue."""
+    try:
+        from cleanvid.services.queue_manager import QueueManager
+        
+        data = request.json
+        video_path = data.get('video_path')
+        priority = data.get('priority', 0)
+        
+        if not video_path:
+            return jsonify({'error': 'video_path required'}), 400
+        
+        proc = get_processor()
+        queue_mgr = QueueManager(proc.settings.paths.config_dir)
+        
+        if queue_mgr.add_to_queue(video_path, priority):
+            return jsonify({
+                'success': True,
+                'message': 'Added to queue',
+                'queue_size': queue_mgr.get_queue_size()
+            })
+        else:
+            return jsonify({'error': 'Already in queue or failed to add'}), 400
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scene-queue/<path:video_path>', methods=['DELETE'])
+def api_remove_from_scene_queue(video_path):
+    """Remove video from scene processing queue."""
+    try:
+        from cleanvid.services.queue_manager import QueueManager
+        
+        proc = get_processor()
+        queue_mgr = QueueManager(proc.settings.paths.config_dir)
+        
+        # Decode path
+        video_path = '/' + video_path
+        
+        if queue_mgr.remove_from_queue(video_path):
+            return jsonify({
+                'success': True,
+                'message': 'Removed from queue'
+            })
+        else:
+            return jsonify({'error': 'Not in queue'}), 404
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scene-queue/process', methods=['POST'])
+def api_process_scene_queue():
+    """Process all videos in scene queue."""
+    try:
+        from cleanvid.services.queue_manager import QueueManager
+        
+        proc = get_processor()
+        queue_mgr = QueueManager(proc.settings.paths.config_dir)
+        
+        queue = queue_mgr.get_queue()
+        
+        if not queue:
+            return jsonify({
+                'success': True,
+                'message': 'Queue is empty',
+                'processed': 0
+            })
+        
+        # Process each video in queue
+        results = []
+        for entry in queue:
+            video_path = entry['video_path']
+            try:
+                # Process video (will use scene filters if they exist)
+                stats = proc.process_single(Path(video_path))
+                results.append({
+                    'video_path': video_path,
+                    'success': stats.successful > 0,
+                    'error': None
+                })
+            except Exception as e:
+                results.append({
+                    'video_path': video_path,
+                    'success': False,
+                    'error': str(e)
+                })
+        
+        # Clear queue after processing
+        queue_mgr.clear_queue()
+        
+        successful = sum(1 for r in results if r['success'])
+        
+        return jsonify({
+            'success': True,
+            'processed': len(results),
+            'successful': successful,
+            'failed': len(results) - successful,
+            'results': results
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 def classify_error(error_msg: str) -> str:
     """Classify error message into category."""
     error_lower = error_msg.lower()

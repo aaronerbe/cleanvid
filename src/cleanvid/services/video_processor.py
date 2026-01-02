@@ -30,7 +30,8 @@ class VideoProcessor:
         subtitle_manager: SubtitleManager,
         profanity_detector: ProfanityDetector,
         ffmpeg_config: FFmpegConfig,
-        ffmpeg_wrapper: Optional[FFmpegWrapper] = None
+        ffmpeg_wrapper: Optional[FFmpegWrapper] = None,
+        config_dir: Optional[Path] = None
     ):
         """
         Initialize VideoProcessor.
@@ -40,11 +41,13 @@ class VideoProcessor:
             profanity_detector: ProfanityDetector instance.
             ffmpeg_config: FFmpeg configuration.
             ffmpeg_wrapper: Optional FFmpegWrapper instance (creates default if None).
+            config_dir: Optional config directory path for scene filters.
         """
         self.subtitle_manager = subtitle_manager
         self.profanity_detector = profanity_detector
         self.ffmpeg_config = ffmpeg_config
         self.ffmpeg = ffmpeg_wrapper or FFmpegWrapper()
+        self.config_dir = config_dir
     
     def extract_metadata(self, video_path: Path) -> VideoMetadata:
         """
@@ -134,8 +137,58 @@ class VideoProcessor:
             # Step 2: Detect profanity
             segments = self.profanity_detector.detect_in_subtitle_file(subtitle_file)
             
-            if len(segments) == 0:
-                # No profanity detected - copy clean video to output
+            # Step 2.5: Load and integrate scene filters
+            video_filter_complex = None
+            scene_zones_applied = 0
+            
+            if self.config_dir:
+                try:
+                    from cleanvid.services.scene_manager import SceneManager
+                    from cleanvid.services.scene_processor import SceneProcessor
+                    from cleanvid.models.scene import ProcessingMode
+                    
+                    scene_mgr = SceneManager(self.config_dir)
+                    scene_proc = SceneProcessor()
+                    
+                    video_filters = scene_mgr.get_video_filters(str(video_path))
+                    
+                    if video_filters and video_filters.zone_count > 0:
+                        print(f"  Found {video_filters.zone_count} scene skip zone(s)")
+                        
+                        # Extract zones by type
+                        blur_zones = video_filters.get_zones_by_mode(ProcessingMode.BLUR)
+                        black_zones = video_filters.get_zones_by_mode(ProcessingMode.BLACK)
+                        scene_mute_zones = video_filters.get_mute_zones()
+                        
+                        # Generate video filter string for blur/black effects
+                        if blur_zones or black_zones:
+                            video_filter_complex = scene_proc.combine_video_filters(blur_zones, black_zones)
+                            scene_zones_applied += len(blur_zones) + len(black_zones)
+                            print(f"  Applying video filters: {len(blur_zones)} blur, {len(black_zones)} black")
+                        
+                        # Extract scene mute time ranges and convert to MuteSegment objects
+                        if scene_mute_zones:
+                            scene_mute_ranges = scene_proc.get_mute_time_ranges(scene_mute_zones)
+                            scene_mute_segments = [
+                                MuteSegment(
+                                    start_time=start,
+                                    end_time=end,
+                                    word="[scene_mute]",
+                                    confidence=1.0
+                                )
+                                for start, end in scene_mute_ranges
+                            ]
+                            
+                            # Merge scene mute segments with profanity segments
+                            segments = segments + scene_mute_segments
+                            print(f"  Adding {len(scene_mute_segments)} scene mute zone(s)")
+                        
+                except Exception as e:
+                    print(f"  Warning: Failed to load scene filters: {e}")
+                    result.add_warning(f"Scene filters not applied: {e}")
+            
+            if len(segments) == 0 and not video_filter_complex:
+                # No profanity detected AND no scene filters - copy clean video to output
                 try:
                     # Ensure output directory exists
                     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -145,7 +198,7 @@ class VideoProcessor:
                     
                     result.output_path = output_path
                     result.status = ProcessingStatus.SKIPPED
-                    result.mark_complete(success=True, error="No profanity detected - clean video copied")
+                    result.mark_complete(success=True, error="No profanity or scene filters - clean video copied")
                     result.add_warning("Video is clean - copied to output without processing")
                     
                     print(f"  ✓ Clean video copied to output")
@@ -164,25 +217,39 @@ class VideoProcessor:
             
             result.segments_muted = len(padded_segments)
             
-            # Step 4: Create FFmpeg filter chain
-            filter_chain = create_ffmpeg_filter_chain(padded_segments)
+            # Step 4: Create FFmpeg filter chain for audio muting
+            audio_filter_chain = create_ffmpeg_filter_chain(padded_segments)
             
             # Step 5: Process video with FFmpeg
-            success = self.ffmpeg.mute_audio(
-                input_path=video_path,
-                output_path=output_path,
-                filter_chain=filter_chain,
-                audio_codec=self.ffmpeg_config.audio_codec,
-                audio_bitrate=self.ffmpeg_config.audio_bitrate,
-                threads=self.ffmpeg_config.threads,
-                re_encode_video=self.ffmpeg_config.re_encode_video,
-                video_codec=self.ffmpeg_config.video_codec,
-                video_crf=self.ffmpeg_config.video_crf
-            )
+            # If we have video filters (blur/black), we need to use filter_complex
+            if video_filter_complex:
+                # Process with both video and audio filters
+                success = self._process_with_scene_filters(
+                    input_path=video_path,
+                    output_path=output_path,
+                    video_filter_complex=video_filter_complex,
+                    audio_filter_chain=audio_filter_chain,
+                    padded_segments=padded_segments
+                )
+            else:
+                # Standard audio-only processing
+                success = self.ffmpeg.mute_audio(
+                    input_path=video_path,
+                    output_path=output_path,
+                    filter_chain=audio_filter_chain,
+                    audio_codec=self.ffmpeg_config.audio_codec,
+                    audio_bitrate=self.ffmpeg_config.audio_bitrate,
+                    threads=self.ffmpeg_config.threads,
+                    re_encode_video=self.ffmpeg_config.re_encode_video,
+                    video_codec=self.ffmpeg_config.video_codec,
+                    video_crf=self.ffmpeg_config.video_crf
+                )
             
             if success:
                 result.output_path = output_path
                 result.mark_complete(success=True)
+                if scene_zones_applied > 0:
+                    result.add_warning(f"Applied {scene_zones_applied} scene filter(s)")
             else:
                 result.mark_complete(success=False, error="FFmpeg processing failed")
         
@@ -190,6 +257,85 @@ class VideoProcessor:
             result.mark_complete(success=False, error=str(e))
         
         return result
+    
+    def _process_with_scene_filters(
+        self,
+        input_path: Path,
+        output_path: Path,
+        video_filter_complex: str,
+        audio_filter_chain: str,
+        padded_segments: List[MuteSegment]
+    ) -> bool:
+        """
+        Process video with both scene filters (blur/black) and audio muting.
+        
+        Uses FFmpeg filter_complex to apply video filters and audio muting in one pass.
+        
+        Args:
+            input_path: Input video path.
+            output_path: Output video path.
+            video_filter_complex: Video filter string (e.g., "[0:v]boxblur=20:20[v]").
+            audio_filter_chain: Audio filter chain for muting.
+            padded_segments: Mute segments for audio.
+        
+        Returns:
+            True if successful, False otherwise.
+        """
+        import subprocess
+        
+        try:
+            # Ensure output directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Build FFmpeg command with filter_complex
+            cmd = [
+                'ffmpeg',
+                '-i', str(input_path),
+                '-threads', str(self.ffmpeg_config.threads),
+            ]
+            
+            # Add video filter
+            cmd.extend(['-filter_complex', video_filter_complex])
+            
+            # Map filtered video
+            cmd.extend(['-map', '[v]'])
+            
+            # Map audio with muting filter if we have segments to mute
+            if padded_segments and audio_filter_chain:
+                cmd.extend(['-map', '0:a', '-af', audio_filter_chain])
+            else:
+                # No audio muting needed, just copy audio
+                cmd.extend(['-map', '0:a'])
+            
+            # Video codec settings (must re-encode when using video filters)
+            cmd.extend(['-c:v', 'libx264', '-preset', 'medium', '-crf', str(self.ffmpeg_config.video_crf or 23)])
+            
+            # Audio codec settings
+            cmd.extend(['-c:a', self.ffmpeg_config.audio_codec, '-b:a', self.ffmpeg_config.audio_bitrate])
+            
+            # Output file
+            cmd.extend(['-y', str(output_path)])  # -y to overwrite
+            
+            print(f"  Running FFmpeg with scene filters...")
+            print(f"  Command: ffmpeg -i ... -filter_complex '{video_filter_complex}' ...")
+            
+            # Run FFmpeg
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode != 0:
+                print(f"  FFmpeg error: {result.stderr[-500:] if result.stderr else 'Unknown error'}")
+                return False
+            
+            print(f"  ✓ Video processed with scene filters")
+            return True
+        
+        except Exception as e:
+            print(f"  Error processing with scene filters: {e}")
+            return False
     
     def can_process(self, video_path: Path) -> tuple[bool, Optional[str]]:
         """
