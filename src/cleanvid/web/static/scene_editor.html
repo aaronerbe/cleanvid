@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scene Editor - Cleanvid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-400">Scene Editor</h1>
+                <p class="text-gray-400 mt-1">Define custom skip zones for videos (blur, black out, or mute)</p>
+            </div>
+            <a href="/" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">
+                ← Back to Dashboard
+            </a>
+        </div>
+
+        <!-- Video Selection Section -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">1. Select Video</h2>
+            
+            <!-- File Browser -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-300 mb-2">Browse Videos:</label>
+                <div id="videoBrowser" class="bg-gray-700 rounded p-4 max-h-60 overflow-y-auto">
+                    <div class="text-gray-400">Loading videos...</div>
+                </div>
+            </div>
+
+            <!-- Selected Video Display -->
+            <div id="selectedVideoDisplay" class="hidden">
+                <div class="bg-blue-900 bg-opacity-30 border border-blue-500 rounded p-3">
+                    <p class="text-sm text-gray-300">Selected: <span id="selectedVideoPath" class="text-blue-400 font-mono text-sm"></span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Skip Zone Editor Section -->
+        <div id="skipZoneEditor" class="hidden bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">2. Add Skip Zones</h2>
+            
+            <!-- Skip Zone Form -->
+            <div class="bg-gray-700 rounded-lg p-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Start Time -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Start Time (HH:MM:SS or MM:SS)</label>
+                        <input type="text" id="startTime" placeholder="01:23:45" 
+                               class="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:border-blue-500 focus:outline-none">
+                        <p class="text-xs text-gray-400 mt-1">Examples: 45:23, 01:45:23</p>
+                    </div>
+                    
+                    <!-- End Time -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">End Time (HH:MM:SS or MM:SS)</label>
+                        <input type="text" id="endTime" placeholder="01:25:30" 
+                               class="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:border-blue-500 focus:outline-none">
+                        <p class="text-xs text-gray-400 mt-1">Must be after start time</p>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                    <input type="text" id="description" placeholder="e.g., Sex scene, Violence, Nudity" maxlength="200"
+                           class="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:border-blue-500 focus:outline-none">
+                    <p class="text-xs text-gray-400 mt-1">Max 200 characters</p>
+                </div>
+
+                <!-- Processing Mode -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Processing Mode</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="mode" value="skip" class="mr-2" checked>
+                            <span class="text-gray-300">Skip Only - No video modification (profanity filtering only)</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="mode" value="blur" class="mr-2">
+                            <span class="text-gray-300">Blur - Apply Gaussian blur to video during this time range</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="mode" value="black" class="mr-2">
+                            <span class="text-gray-300">Black Out - Replace video with black frames during this time range</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Mute Option -->
+                <div class="mb-4">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="muteCheckbox" class="mr-2" disabled>
+                        <span id="muteLabel" class="text-gray-500">Mute audio during this scene (only available for Blur/Black modes)</span>
+                    </label>
+                </div>
+
+                <!-- Add Zone Button -->
+                <button onclick="addSkipZone()" class="w-full px-4 py-2 bg-green-600 hover:bg-green-500 rounded transition font-medium">
+                    + Add Skip Zone
+                </button>
+            </div>
+
+            <!-- Skip Zones List -->
+            <div id="skipZonesList" class="space-y-2">
+                <h3 class="text-lg font-medium mb-2">Skip Zones for this Video:</h3>
+                <div id="zonesContainer" class="space-y-2">
+                    <p class="text-gray-400 text-sm">No skip zones added yet</p>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 flex gap-3">
+                <button onclick="saveAndProcessNow()" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg transition font-medium">
+                    💾 Save & Process Now
+                </button>
+                <button onclick="saveAndAddToQueue()" class="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg transition font-medium">
+                    📋 Save & Add to Queue
+                </button>
+                <button onclick="saveOnly()" class="px-6 py-3 bg-gray-600 hover:bg-gray-500 rounded-lg transition font-medium">
+                    Save Only
+                </button>
+            </div>
+        </div>
+
+        <!-- Queue Section -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold">Processing Queue</h2>
+                <button onclick="processQueue()" class="px-4 py-2 bg-green-600 hover:bg-green-500 rounded transition">
+                    ▶ Process Queue
+                </button>
+            </div>
+            
+            <div id="queueContainer">
+                <p class="text-gray-400">Loading queue...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        let currentVideo = null;
+        let skipZones = [];
+        let editingZoneId = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadVideoBrowser();
+            loadQueue();
+            setupModeListeners();
+        });
+
+        // Setup mode radio button listeners
+        function setupModeListeners() {
+            const modeRadios = document.querySelectorAll('input[name="mode"]');
+            const muteCheckbox = document.getElementById('muteCheckbox');
+            const muteLabel = document.getElementById('muteLabel');
+
+            modeRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const mode = e.target.value;
+                    if (mode === 'blur' || mode === 'black') {
+                        muteCheckbox.disabled = false;
+                        muteLabel.classList.remove('text-gray-500');
+                        muteLabel.classList.add('text-gray-300');
+                    } else {
+                        muteCheckbox.disabled = true;
+                        muteCheckbox.checked = false;
+                        muteLabel.classList.remove('text-gray-300');
+                        muteLabel.classList.add('text-gray-500');
+                    }
+                });
+            });
+        }
+
+        // Load video browser
+        async function loadVideoBrowser(path = '') {
+            try {
+                const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+
+                const browser = document.getElementById('videoBrowser');
+                browser.innerHTML = '';
+
+                data.items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'p-2 hover:bg-gray-600 rounded cursor-pointer flex items-center justify-between';
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = item.type === 'directory' ? `📁 ${item.name}` : `🎬 ${item.name}`;
+                    div.appendChild(nameSpan);
+
+                    if (item.type === 'directory') {
+                        div.onclick = () => loadVideoBrowser(item.path);
+                    } else {
+                        div.onclick = () => selectVideo(item.path, item.name);
+                    }
+
+                    browser.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error loading videos:', error);
+                document.getElementById('videoBrowser').innerHTML = '<p class="text-red-400">Error loading videos</p>';
+            }
+        }
+
+        // Select a video
+        async function selectVideo(path, name) {
+            currentVideo = path;
+            
+            // Show selected video
+            document.getElementById('selectedVideoDisplay').classList.remove('hidden');
+            document.getElementById('selectedVideoPath').textContent = name;
+            document.getElementById('skipZoneEditor').classList.remove('hidden');
+
+            // Load existing filters for this video
+            try {
+                const encodedPath = path.substring(1); // Remove leading /
+                const response = await fetch(`/api/scene-filters/${encodedPath}`);
+                const data = await response.json();
+
+                skipZones = data.skip_zones || [];
+                renderSkipZones();
+            } catch (error) {
+                console.error('Error loading filters:', error);
+                skipZones = [];
+                renderSkipZones();
+            }
+        }
+
+        // Add skip zone
+        function addSkipZone() {
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            const description = document.getElementById('description').value;
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            const mute = document.getElementById('muteCheckbox').checked;
+
+            // Validation
+            if (!startTime || !endTime) {
+                alert('Please enter start and end times');
+                return;
+            }
+
+            if (!description) {
+                alert('Please enter a description');
+                return;
+            }
+
+            // Create zone object
+            const zone = {
+                id: editingZoneId || generateId(),
+                start_display: startTime,
+                end_display: endTime,
+                description: description,
+                mode: mode,
+                mute: mute
+            };
+
+            if (editingZoneId) {
+                // Update existing zone
+                const index = skipZones.findIndex(z => z.id === editingZoneId);
+                if (index !== -1) {
+                    skipZones[index] = zone;
+                }
+                editingZoneId = null;
+            } else {
+                // Add new zone
+                skipZones.push(zone);
+            }
+
+            // Clear form
+            document.getElementById('startTime').value = '';
+            document.getElementById('endTime').value = '';
+            document.getElementById('description').value = '';
+            document.querySelector('input[name="mode"][value="skip"]').checked = true;
+            document.getElementById('muteCheckbox').checked = false;
+            document.getElementById('muteCheckbox').disabled = true;
+
+            renderSkipZones();
+        }
+
+        // Render skip zones list
+        function renderSkipZones() {
+            const container = document.getElementById('zonesContainer');
+            
+            if (skipZones.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-sm">No skip zones added yet</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            skipZones.forEach(zone => {
+                const div = document.createElement('div');
+                div.className = 'bg-gray-600 rounded p-3 flex items-center justify-between';
+                
+                const info = document.createElement('div');
+                info.innerHTML = `
+                    <div class="font-medium">${zone.description}</div>
+                    <div class="text-sm text-gray-300">
+                        ${zone.start_display} - ${zone.end_display} 
+                        <span class="text-blue-400">| ${zone.mode.toUpperCase()}</span>
+                        ${zone.mute ? '<span class="text-red-400">| MUTE</span>' : ''}
+                    </div>
+                `;
+                
+                const buttons = document.createElement('div');
+                buttons.className = 'flex gap-2';
+                
+                const editBtn = document.createElement('button');
+                editBtn.textContent = 'Edit';
+                editBtn.className = 'px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm';
+                editBtn.onclick = () => editSkipZone(zone.id);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.className = 'px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm';
+                deleteBtn.onclick = () => deleteSkipZone(zone.id);
+                
+                buttons.appendChild(editBtn);
+                buttons.appendChild(deleteBtn);
+                
+                div.appendChild(info);
+                div.appendChild(buttons);
+                container.appendChild(div);
+            });
+        }
+
+        // Edit skip zone
+        function editSkipZone(id) {
+            const zone = skipZones.find(z => z.id === id);
+            if (!zone) return;
+
+            document.getElementById('startTime').value = zone.start_display;
+            document.getElementById('endTime').value = zone.end_display;
+            document.getElementById('description').value = zone.description;
+            document.querySelector(`input[name="mode"][value="${zone.mode}"]`).checked = true;
+            document.getElementById('muteCheckbox').checked = zone.mute;
+
+            // Enable mute checkbox if blur/black
+            if (zone.mode === 'blur' || zone.mode === 'black') {
+                document.getElementById('muteCheckbox').disabled = false;
+            }
+
+            editingZoneId = id;
+        }
+
+        // Delete skip zone
+        function deleteSkipZone(id) {
+            if (!confirm('Delete this skip zone?')) return;
+            
+            skipZones = skipZones.filter(z => z.id !== id);
+            renderSkipZones();
+        }
+
+        // Save filters
+        async function saveFilters() {
+            if (!currentVideo) {
+                alert('No video selected');
+                return false;
+            }
+
+            try {
+                const encodedPath = currentVideo.substring(1); // Remove leading /
+                const response = await fetch(`/api/scene-filters/${encodedPath}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        skip_zones: skipZones
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    return true;
+                } else {
+                    alert('Failed to save: ' + (data.error || 'Unknown error'));
+                    return false;
+                }
+            } catch (error) {
+                alert('Error saving filters: ' + error.message);
+                return false;
+            }
+        }
+
+        // Save only
+        async function saveOnly() {
+            if (await saveFilters()) {
+                alert('Filters saved successfully!');
+            }
+        }
+
+        // Save and process now
+        async function saveAndProcessNow() {
+            if (await saveFilters()) {
+                try {
+                    const response = await fetch('/api/process', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            video_path: currentVideo
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert('Processing started!');
+                    } else {
+                        alert('Processing failed: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    alert('Error starting processing: ' + error.message);
+                }
+            }
+        }
+
+        // Save and add to queue
+        async function saveAndAddToQueue() {
+            if (await saveFilters()) {
+                try {
+                    const response = await fetch('/api/scene-queue', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            video_path: currentVideo
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert('Added to queue!');
+                        loadQueue();
+                    } else {
+                        alert('Failed to add to queue: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    alert('Error adding to queue: ' + error.message);
+                }
+            }
+        }
+
+        // Load queue
+        async function loadQueue() {
+            try {
+                const response = await fetch('/api/scene-queue');
+                const data = await response.json();
+
+                const container = document.getElementById('queueContainer');
+                
+                if (data.queue.length === 0) {
+                    container.innerHTML = '<p class="text-gray-400">Queue is empty</p>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                data.queue.forEach(entry => {
+                    const div = document.createElement('div');
+                    div.className = 'bg-gray-700 rounded p-3 mb-2 flex items-center justify-between';
+                    
+                    const pathSpan = document.createElement('span');
+                    pathSpan.className = 'font-mono text-sm';
+                    pathSpan.textContent = entry.video_path;
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = 'Remove';
+                    removeBtn.className = 'px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm';
+                    removeBtn.onclick = async () => {
+                        const encodedPath = entry.video_path.substring(1);
+                        await fetch(`/api/scene-queue/${encodedPath}`, {method: 'DELETE'});
+                        loadQueue();
+                    };
+                    
+                    div.appendChild(pathSpan);
+                    div.appendChild(removeBtn);
+                    container.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error loading queue:', error);
+            }
+        }
+
+        // Process queue
+        async function processQueue() {
+            if (!confirm('Process all videos in the queue?')) return;
+
+            try {
+                const response = await fetch('/api/scene-queue/process', {method: 'POST'});
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`Queue processed! ${data.successful} successful, ${data.failed} failed`);
+                    loadQueue();
+                } else {
+                    alert('Error processing queue: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error processing queue: ' + error.message);
+            }
+        }
+
+        // Generate random ID
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+    </script>
+</body>
+</html>

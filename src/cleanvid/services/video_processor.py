@@ -247,6 +247,8 @@ class VideoProcessor:
             
             if success:
                 result.output_path = output_path
+                result.scene_zones_processed = scene_zones_applied
+                result.has_custom_scenes = (scene_zones_applied > 0)
                 result.mark_complete(success=True)
                 if scene_zones_applied > 0:
                     result.add_warning(f"Applied {scene_zones_applied} scene filter(s)")

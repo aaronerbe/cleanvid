@@ -72,6 +72,8 @@ class ProcessingResult:
     output_path: Optional[Path] = None
     segments_muted: int = 0
     subtitle_downloaded: bool = False
+    scene_zones_processed: int = 0
+    has_custom_scenes: bool = False
     error_message: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
     
@@ -122,6 +124,8 @@ class ProcessingResult:
             "output_path": str(self.output_path) if self.output_path else None,
             "segments_muted": self.segments_muted,
             "subtitle_downloaded": self.subtitle_downloaded,
+            "scene_zones_processed": self.scene_zones_processed,
+            "has_custom_scenes": self.has_custom_scenes,
             "duration_seconds": self.duration_seconds,
             "error_message": self.error_message,
             "warnings": self.warnings,

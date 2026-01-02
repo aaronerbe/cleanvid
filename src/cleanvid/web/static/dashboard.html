@@ -432,6 +432,7 @@
                                     </div>
                                     <div class="text-sm text-gray-500 mt-1">${timestamp}</div>
                                     ${entry.segments_muted ? `<div class="text-sm text-blue-600 mt-1">Segments muted: ${entry.segments_muted}</div>` : ''}
+                                    ${entry.scene_zones_processed ? `<div class="text-sm text-purple-600 mt-1">Scene zones: ${entry.scene_zones_processed}</div>` : ''}
                                     ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error.substring(0, 100)}${entry.error.length > 100 ? '...' : ''}</div>` : ''}
                                 </div>
                             </div>
