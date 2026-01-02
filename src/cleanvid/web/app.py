@@ -527,21 +527,17 @@ def api_save_video_scene_filters(video_path):
         skip_zones = []
         for zone_data in skip_zones_data:
             try:
-                # Handle timestamp formats
-                if 'start_time' in zone_data:
-                    start_time = float(zone_data['start_time'])
-                else:
-                    start_time = parse_timestamp(zone_data['start_display'])
+                # Parse timestamps from display format
+                start_time = parse_timestamp(zone_data.get('start_display', zone_data.get('start_time', '0:00')))
+                end_time = parse_timestamp(zone_data.get('end_display', zone_data.get('end_time', '0:01')))
                 
-                if 'end_time' in zone_data:
-                    end_time = float(zone_data['end_time'])
-                else:
-                    end_time = parse_timestamp(zone_data['end_display'])
-                
+                # Create zone with both time formats
                 zone = SkipZone(
                     id=zone_data.get('id'),
                     start_time=start_time,
                     end_time=end_time,
+                    start_display=zone_data.get('start_display', '0:00'),
+                    end_display=zone_data.get('end_display', '0:01'),
                     description=zone_data.get('description', ''),
                     mode=zone_data.get('mode', 'skip'),
                     mute=zone_data.get('mute', False)
