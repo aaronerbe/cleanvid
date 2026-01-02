@@ -84,6 +84,77 @@ class SceneProcessor:
         # t=fill: thickness=fill (fills the box instead of just drawing outline)
         return f"drawbox=x=0:y=0:w=iw:h=ih:c=black@1:t=fill:enable='{enable_expr}'"
     
+    def generate_skip_filter(self, zones: List[SkipZone], duration: float) -> tuple[str, str]:
+        """
+        Generate FFmpeg trim/concat filter to cut out skip zones.
+        
+        This creates a filter that REMOVES the skip zones from the video,
+        making the output video shorter.
+        
+        Args:
+            zones: List of skip zones with SKIP mode
+            duration: Total video duration in seconds
+        
+        Returns:
+            Tuple of (video_filter, audio_filter) for filter_complex
+        
+        Example:
+            Skip zones: [(100, 200), (300, 400)]
+            Keep segments: [0-100, 200-300, 400-end]
+            Returns filters that trim and concatenate these segments
+        """
+        if not zones:
+            return ("", "")
+        
+        # Sort zones by start time
+        sorted_zones = sorted(zones, key=lambda z: z.start_time)
+        
+        # Calculate "keep" segments (inverse of skip zones)
+        keep_segments = []
+        last_end = 0.0
+        
+        for zone in sorted_zones:
+            if zone.start_time > last_end:
+                # Add segment before this skip zone
+                keep_segments.append((last_end, zone.start_time))
+            last_end = max(last_end, zone.end_time)
+        
+        # Add final segment after last skip zone
+        if last_end < duration:
+            keep_segments.append((last_end, duration))
+        
+        if not keep_segments:
+            # Everything is being skipped - this shouldn't happen
+            return ("", "")
+        
+        # Build trim + concat filter
+        video_parts = []
+        audio_parts = []
+        
+        for i, (start, end) in enumerate(keep_segments, 1):
+            # Video trim
+            if end == duration:
+                # Last segment - trim to end
+                video_parts.append(f"[0:v]trim=start={start},setpts=PTS-STARTPTS[v{i}]")
+                audio_parts.append(f"[0:a]atrim=start={start},asetpts=PTS-STARTPTS[a{i}]")
+            else:
+                # Trim with both start and end
+                video_parts.append(f"[0:v]trim=start={start}:end={end},setpts=PTS-STARTPTS[v{i}]")
+                audio_parts.append(f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{i}]")
+        
+        # Build concat input list
+        n = len(keep_segments)
+        concat_inputs = ''.join([f"[v{i}][a{i}]" for i in range(1, n+1)])
+        
+        # Combine all filters
+        video_filter = '; '.join(video_parts)
+        audio_filter = '; '.join(audio_parts)
+        concat_filter = f"{concat_inputs}concat=n={n}:v=1:a=1[outv][outa]"
+        
+        full_filter = f"{video_filter}; {audio_filter}; {concat_filter}"
+        
+        return full_filter
+    
     def combine_video_filters(
         self,
         blur_zones: List[SkipZone],

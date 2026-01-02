@@ -163,14 +163,27 @@ class VideoProcessor:
                         print(f"  🔍 DEBUG: Skip zones: {[{'desc': z.description, 'mode': z.mode.value, 'start': z.start_time, 'end': z.end_time} for z in video_filters.skip_zones]}")
                         
                         # Extract zones by type
+                        skip_zones = video_filters.get_zones_by_mode(ProcessingMode.SKIP)
                         blur_zones = video_filters.get_zones_by_mode(ProcessingMode.BLUR)
                         black_zones = video_filters.get_zones_by_mode(ProcessingMode.BLACK)
                         scene_mute_zones = video_filters.get_mute_zones()
                         
-                        print(f"  🔍 DEBUG: Blur zones: {len(blur_zones)}, Black zones: {len(black_zones)}, Mute zones: {len(scene_mute_zones)}")
+                        print(f"  🔍 DEBUG: Skip zones: {len(skip_zones)}, Blur zones: {len(blur_zones)}, Black zones: {len(black_zones)}, Mute zones: {len(scene_mute_zones)}")
+                        
+                        # Check if we have SKIP zones - these require special handling
+                        if skip_zones:
+                            # Get video duration for skip filter
+                            probe_result = self.ffmpeg.probe(video_path)
+                            duration = probe_result.duration
+                            
+                            # Generate skip filter (cuts out segments)
+                            video_filter_complex = scene_proc.generate_skip_filter(skip_zones, duration)
+                            scene_zones_applied += len(skip_zones)
+                            print(f"  ✅ Will CUT OUT {len(skip_zones)} skip zone(s) - output will be shorter")
+                            print(f"  🔍 DEBUG: Generated skip filter (trim+concat)")
                         
                         # Generate video filter string for blur/black effects
-                        if blur_zones or black_zones:
+                        elif blur_zones or black_zones:
                             video_filter_complex = scene_proc.combine_video_filters(blur_zones, black_zones)
                             scene_zones_applied += len(blur_zones) + len(black_zones)
                             print(f"  ✅ Applying video filters: {len(blur_zones)} blur, {len(black_zones)} black")
@@ -237,16 +250,116 @@ class VideoProcessor:
             audio_filter_chain = create_ffmpeg_filter_chain(padded_segments)
             
             # Step 5: Process video with FFmpeg
-            # If we have video filters (blur/black), we need to use filter_complex
+            # Two-pass approach: BLUR/BLACK first, then SKIP cuts
+            
+            # Determine if we need skip processing (separate pass)
+            skip_zones = []
+            if self.config_dir:
+                try:
+                    from cleanvid.services.scene_manager import SceneManager
+                    from cleanvid.models.scene import ProcessingMode
+                    
+                    scene_mgr = SceneManager(self.config_dir)
+                    video_filters = scene_mgr.get_video_filters(str(video_path))
+                    
+                    if video_filters:
+                        skip_zones = video_filters.get_zones_by_mode(ProcessingMode.SKIP)
+                except:
+                    pass
+            
+            # Pass 1: BLUR/BLACK + profanity muting
             if video_filter_complex:
-                # Process with both video and audio filters
+                # If we have skip zones, use a temp output for pass 1
+                if skip_zones:
+                    temp_output = output_path.parent / f"{output_path.stem}_temp{output_path.suffix}"
+                    print(f"  🔄 Two-pass processing: Pass 1 (BLUR/BLACK) -> temp file")
+                    pass1_output = temp_output
+                else:
+                    pass1_output = output_path
+                
+                # Process with blur/black filters
+                success = self._process_with_scene_filters(
+                    input_path=video_path,
+                    output_path=pass1_output,
+                    video_filter_complex=video_filter_complex,
+                    audio_filter_chain=audio_filter_chain,
+                    padded_segments=padded_segments,
+                    is_skip_mode=False
+                )
+                
+                if not success:
+                    result.mark_complete(success=False, error="Pass 1 (BLUR/BLACK) failed")
+                    return result
+                
+                # Pass 2: SKIP cuts (if needed)
+                if skip_zones:
+                    print(f"  🔄 Two-pass processing: Pass 2 (SKIP cuts)")
+                    from cleanvid.services.scene_processor import SceneProcessor
+                    
+                    scene_proc = SceneProcessor()
+                    
+                    # Get duration of pass 1 output
+                    probe_result = self.ffmpeg.probe(pass1_output)
+                    duration = probe_result.duration
+                    
+                    # Generate skip filter
+                    skip_filter = scene_proc.generate_skip_filter(skip_zones, duration)
+                    
+                    # Apply skip cuts to temp file
+                    success = self._process_with_scene_filters(
+                        input_path=pass1_output,
+                        output_path=output_path,
+                        video_filter_complex=skip_filter,
+                        audio_filter_chain="",  # No audio filter needed
+                        padded_segments=[],
+                        is_skip_mode=True
+                    )
+                    
+                    # Clean up temp file
+                    try:
+                        pass1_output.unlink()
+                    except:
+                        pass
+                    
+                    if not success:
+                        result.mark_complete(success=False, error="Pass 2 (SKIP) failed")
+                        return result
+                    
+                    scene_zones_applied += len(skip_zones)
+                    print(f"  ✅ Cut out {len(skip_zones)} scene(s) - output is shorter")
+            
+            # No blur/black, but we have skip zones
+            elif skip_zones:
+                print(f"  🔄 Single-pass processing: SKIP cuts only")
+                from cleanvid.services.scene_processor import SceneProcessor
+                
+                scene_proc = SceneProcessor()
+                
+                # Get video duration
+                probe_result = self.ffmpeg.probe(video_path)
+                duration = probe_result.duration
+                
+                # Generate skip filter
+                skip_filter = scene_proc.generate_skip_filter(skip_zones, duration)
+                
+                # Apply skip cuts
                 success = self._process_with_scene_filters(
                     input_path=video_path,
                     output_path=output_path,
-                    video_filter_complex=video_filter_complex,
-                    audio_filter_chain=audio_filter_chain,
-                    padded_segments=padded_segments
+                    video_filter_complex=skip_filter,
+                    audio_filter_chain=audio_filter_chain if padded_segments else "",
+                    padded_segments=padded_segments,
+                    is_skip_mode=True
                 )
+                
+                if not success:
+                    result.mark_complete(success=False, error="SKIP processing failed")
+                    return result
+                
+                scene_zones_applied += len(skip_zones)
+                print(f"  ✅ Cut out {len(skip_zones)} scene(s) - output is shorter")
+            
+            # No scene filters at all - standard profanity muting
             else:
                 # Standard audio-only processing
                 success = self.ffmpeg.mute_audio(
