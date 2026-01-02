@@ -243,6 +243,33 @@ class SceneManager:
         """
         return self.load_scene_filters()
     
+    def get_filter_statistics(self) -> Dict:
+        """
+        Get statistics about scene filters.
+        
+        Returns:
+            Dictionary with filter statistics
+        """
+        filters = self.load_scene_filters()
+        
+        total_videos = len(filters)
+        total_zones = sum(len(f.skip_zones) for f in filters.values())
+        
+        # Count by mode
+        mode_counts = {'skip': 0, 'blur': 0, 'black': 0}
+        for video_filters in filters.values():
+            for zone in video_filters.skip_zones:
+                mode_counts[zone.mode.value] += 1
+        
+        return {
+            'total_videos': total_videos,
+            'total_zones': total_zones,
+            'zones_by_mode': mode_counts,
+            'videos_with_blur': sum(1 for f in filters.values() if any(z.mode == ProcessingMode.BLUR for z in f.skip_zones)),
+            'videos_with_black': sum(1 for f in filters.values() if any(z.mode == ProcessingMode.BLACK for z in f.skip_zones)),
+            'videos_with_mute': sum(1 for f in filters.values() if any(z.mute for z in f.skip_zones))
+        }
+    
     # Queue Management
     
     def load_queue(self) -> List[str]:
