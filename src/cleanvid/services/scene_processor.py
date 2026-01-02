@@ -46,12 +46,12 @@ class SceneProcessor:
         
         enable_expr = '+'.join(enable_expressions)
         
-        # boxblur syntax: boxblur=luma_radius:luma_power[:chroma_radius:chroma_power]
-        # luma_radius: blur radius (higher = more blur, typical range 2-50)
-        # luma_power: how many times to apply (1-10, higher = slower but stronger)
-        # Using power=2 for minimum effective blur (fastest)
-        # Also blur chroma (color) channels for better effect
-        return f"boxblur=luma_radius=25:luma_power=2:chroma_radius=25:chroma_power=2:enable='{enable_expr}'"
+        # gblur syntax: gblur=sigma=STRENGTH:steps=STEPS:enable='EXPRESSION'
+        # sigma: blur strength (0.5-100+, typically 5-20 for good privacy)
+        # steps: quality of approximation (1-6, higher = better but slower)
+        # Using sigma=10 for good privacy blur, steps=1 for max speed
+        # gblur is MUCH faster than boxblur (single-pass vs multi-pass)
+        return f"gblur=sigma=20:steps=1:enable='{enable_expr}'"
     
     def generate_black_filter(self, zones: List[SkipZone]) -> str:
         """
