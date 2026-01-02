@@ -405,6 +405,14 @@
             }
             
             isProcessing = true;
+            
+            // Disable button and show loading
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Processing...';
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            
             console.log('Save & Process Now clicked');
             console.log('Current video:', currentVideo);
             console.log('Skip zones:', skipZones);
@@ -426,22 +434,38 @@
                         console.log('Process API response data:', data);
                         
                         if (data.success) {
+                            btn.innerHTML = '✅ Processing Started!';
+                            btn.classList.remove('bg-blue-600', 'hover:bg-blue-500');
+                            btn.classList.add('bg-green-600');
                             alert('Processing started! Check the dashboard for progress.');
                         } else {
+                            btn.innerHTML = '❌ Failed';
+                            btn.classList.remove('bg-blue-600', 'hover:bg-blue-500');
+                            btn.classList.add('bg-red-600');
                             alert('Processing failed: ' + (data.error || 'Unknown error'));
                         }
                     } catch (error) {
                         console.error('Error in saveAndProcessNow:', error);
+                        btn.innerHTML = '❌ Error';
+                        btn.classList.remove('bg-blue-600', 'hover:bg-blue-500');
+                        btn.classList.add('bg-red-600');
                         alert('Error starting processing: ' + error.message);
                     }
                 } else {
                     console.log('Save filters failed, not processing');
+                    btn.innerHTML = '❌ Save Failed';
+                    btn.classList.remove('bg-blue-600', 'hover:bg-blue-500');
+                    btn.classList.add('bg-red-600');
                 }
             } finally {
-                // Re-enable processing after 2 seconds
+                // Re-enable and reset button after 3 seconds
                 setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-green-600', 'bg-red-600');
+                    btn.classList.add('bg-blue-600', 'hover:bg-blue-500');
                     isProcessing = false;
-                }, 2000);
+                }, 3000);
             }
         }
 

@@ -32,7 +32,7 @@ class SceneProcessor:
             FFmpeg filter string
         
         Example:
-            boxblur=20:20:enable='between(t,45.5,47.25)+between(t,60.0,65.5)'
+            boxblur=luma_radius=25:luma_power=3:enable='between(t,45.5,47.25)+between(t,60.0,65.5)'
         """
         if not zones:
             return ""
@@ -46,9 +46,11 @@ class SceneProcessor:
         
         enable_expr = '+'.join(enable_expressions)
         
-        # boxblur syntax: boxblur=luma_radius:luma_power:enable='expression'
-        # Higher radius = more blur (20 is quite strong)
-        return f"boxblur=20:20:enable='{enable_expr}'"
+        # boxblur syntax: boxblur=luma_radius:luma_power[:chroma_radius:chroma_power]
+        # luma_radius: blur radius (higher = more blur, typical range 2-50)
+        # luma_power: how many times to apply (1-10, higher = slower but stronger)
+        # Also blur chroma (color) channels for better effect
+        return f"boxblur=luma_radius=25:luma_power=3:chroma_radius=25:chroma_power=3:enable='{enable_expr}'"
     
     def generate_black_filter(self, zones: List[SkipZone]) -> str:
         """
@@ -61,7 +63,7 @@ class SceneProcessor:
             FFmpeg filter string
         
         Example:
-            drawbox=c=black@1:t=fill:enable='between(t,45.5,47.25)+between(t,60.0,65.5)'
+            drawbox=x=0:y=0:w=iw:h=ih:c=black@1:t=fill:enable='between(t,45.5,47.25)+between(t,60.0,65.5)'
         """
         if not zones:
             return ""
@@ -75,9 +77,12 @@ class SceneProcessor:
         
         enable_expr = '+'.join(enable_expressions)
         
-        # drawbox syntax: drawbox=color:thickness:enable='expression'
-        # c=black@1 = black color at full opacity, t=fill = fill entire frame
-        return f"drawbox=c=black@1:t=fill:enable='{enable_expr}'"
+        # drawbox syntax: drawbox=x:y:width:height:color:thickness
+        # x=0, y=0: top-left corner
+        # w=iw, h=ih: full input width and height (covers entire frame)
+        # c=black@1: black color at full opacity
+        # t=fill: thickness=fill (fills the box instead of just drawing outline)
+        return f"drawbox=x=0:y=0:w=iw:h=ih:c=black@1:t=fill:enable='{enable_expr}'"
     
     def combine_video_filters(
         self,
