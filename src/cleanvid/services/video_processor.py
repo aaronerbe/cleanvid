@@ -387,7 +387,8 @@ class VideoProcessor:
         output_path: Path,
         video_filter_complex: str,
         audio_filter_chain: str,
-        padded_segments: List[MuteSegment]
+        padded_segments: List[MuteSegment],
+        is_skip_mode: bool = False
     ) -> bool:
         """
         Process video with both scene filters (blur/black) and audio muting.
@@ -417,23 +418,25 @@ class VideoProcessor:
                 '-threads', str(self.ffmpeg_config.threads),
             ]
             
-            # Add video filter with proper formatting
-            # scene_proc returns just the filter (e.g., "boxblur=20:20:enable='...'") 
-            # We need to wrap it as: [0:v]filter[v]
-            filter_with_labels = f"[0:v]{video_filter_complex}[v]"
-            cmd.extend(['-filter_complex', filter_with_labels])
-            
-            print(f"  🔍 DEBUG: Video filter with labels: {filter_with_labels}")
-            
-            # Map filtered video
-            cmd.extend(['-map', '[v]'])
-            
-            # Map audio with muting filter if we have segments to mute
-            if padded_segments and audio_filter_chain:
-                cmd.extend(['-map', '0:a', '-af', audio_filter_chain])
+            # Handle SKIP mode vs BLUR/BLACK mode differently
+            if is_skip_mode:
+                # SKIP mode: filter already has [outv][outa] from trim+concat
+                cmd.extend(['-filter_complex', video_filter_complex])
+                cmd.extend(['-map', '[outv]', '-map', '[outa]'])
+                print(f"  🔍 DEBUG: Skip mode - using [outv][outa] outputs")
             else:
-                # No audio muting needed, just copy audio
-                cmd.extend(['-map', '0:a'])
+                # BLUR/BLACK mode: wrap filter with [0:v]...[v]
+                filter_with_labels = f"[0:v]{video_filter_complex}[v]"
+                cmd.extend(['-filter_complex', filter_with_labels])
+                cmd.extend(['-map', '[v]'])
+                
+                print(f"  🔍 DEBUG: Blur/Black mode filter: {filter_with_labels}")
+                
+                # Map audio with muting filter if we have segments to mute
+                if padded_segments and audio_filter_chain:
+                    cmd.extend(['-map', '0:a', '-af', audio_filter_chain])
+                else:
+                    cmd.extend(['-map', '0:a'])
             
             # Video codec settings (must re-encode when using video filters)
             cmd.extend(['-c:v', 'libx264', '-preset', 'medium', '-crf', str(self.ffmpeg_config.video_crf or 23)])
