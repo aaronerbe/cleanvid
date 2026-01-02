@@ -170,24 +170,16 @@ class VideoProcessor:
                         
                         print(f"  🔍 DEBUG: Skip zones: {len(skip_zones)}, Blur zones: {len(blur_zones)}, Black zones: {len(black_zones)}, Mute zones: {len(scene_mute_zones)}")
                         
-                        # Check if we have SKIP zones - these require special handling
-                        if skip_zones:
-                            # Get video duration for skip filter
-                            probe_result = self.ffmpeg.probe(video_path)
-                            duration = probe_result.duration
-                            
-                            # Generate skip filter (cuts out segments)
-                            video_filter_complex = scene_proc.generate_skip_filter(skip_zones, duration)
-                            scene_zones_applied += len(skip_zones)
-                            print(f"  ✅ Will CUT OUT {len(skip_zones)} skip zone(s) - output will be shorter")
-                            print(f"  🔍 DEBUG: Generated skip filter (trim+concat)")
-                        
-                        # Generate video filter string for blur/black effects
-                        elif blur_zones or black_zones:
+                        # Generate BLUR/BLACK filters (SKIP handled later in two-pass logic)
+                        if blur_zones or black_zones:
                             video_filter_complex = scene_proc.combine_video_filters(blur_zones, black_zones)
                             scene_zones_applied += len(blur_zones) + len(black_zones)
                             print(f"  ✅ Applying video filters: {len(blur_zones)} blur, {len(black_zones)} black")
                             print(f"  🔍 DEBUG: Generated filter: {video_filter_complex}")
+                        
+                        # Note skip zones for later two-pass processing
+                        if skip_zones:
+                            print(f"  ℹ️  Will CUT OUT {len(skip_zones)} skip zone(s) in second pass")
                         
                         # Extract scene mute time ranges and convert to MuteSegment objects
                         if scene_mute_zones:
