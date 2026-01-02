@@ -55,12 +55,15 @@ class SceneManager:
             print(f"Warning: Failed to load scene filters: {e}")
             return {}
     
-    def save_scene_filters(self, filters: Dict[str, VideoSceneFilters]) -> None:
+    def save_scene_filters(self, filters: Dict[str, VideoSceneFilters]) -> bool:
         """
         Save scene filters to disk with automatic backup.
         
         Args:
             filters: Dictionary of video filters to save
+            
+        Returns:
+            True if successful, False otherwise
         """
         try:
             # Create backup if file exists
@@ -88,10 +91,12 @@ class SceneManager:
             # Save to file
             with open(self.scene_filters_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
+            
+            return True
         
         except Exception as e:
             print(f"Error saving scene filters: {e}")
-            raise
+            return False
     
     def get_video_filters(self, video_path: str) -> Optional[VideoSceneFilters]:
         """
