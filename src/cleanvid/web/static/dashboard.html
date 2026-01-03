@@ -506,9 +506,15 @@
                         const error = entry.error || 'Unknown error';
                         const escapedPath = entry.video_path.replace(/'/g, "\\'");
                         
+                        // Extract relative path (everything after the base input directory)
+                        // This will show something like "Mandalorian/Season01/S01E03.mkv"
+                        const pathParts = entry.video_path.split('/');
+                        const relevantPath = pathParts.slice(-3).join('/'); // Last 3 parts: Series/Season/Episode
+                        
                         div.innerHTML = `
                             <div>
                                 <div class="font-medium text-red-600">${videoName}</div>
+                                <div class="text-xs text-gray-500 mt-1">${relevantPath}</div>
                                 <div class="text-sm text-gray-600 mt-1">${error.substring(0, 100)}${error.length > 100 ? '...' : ''}</div>
                                 <div class="mt-2 flex gap-2">
                                     <button 
