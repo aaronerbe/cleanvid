@@ -229,10 +229,14 @@
                     <div class="mb-4 flex justify-between items-center">
                         <p class="text-gray-600">Process individual videos or run full batch processing</p>
                         <div class="flex gap-3">
-                            <a href="/scene_editor.html" class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold">
+                            <a href="/scene_editor.html" 
+                               class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
+                               title="Edit scene filters (blur, black, skip) for videos with sensitive content">
                                 🎬 Scene Editor
                             </a>
-                            <button onclick="processAll()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                            <button onclick="processAll()" 
+                                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                                    title="Queue all unprocessed videos for profanity filtering. Videos will be processed in the background.">
                                 Process All Unprocessed Videos
                             </button>
                         </div>
@@ -245,10 +249,14 @@
                             class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             onkeyup="searchVideos()"
                         />
-                        <button onclick="openBrowseModal()" class="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">
+                        <button onclick="openBrowseModal()" 
+                                class="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600"
+                                title="Browse and select videos from your library">
                             Browse
                         </button>
-                        <button onclick="processSelected()" class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
+                        <button onclick="processSelected()" 
+                                class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                                title="Queue the selected video for profanity filtering. Processing happens in the background.">
                             Process
                         </button>
                     </div>
@@ -581,9 +589,7 @@
                     return;
                 }
                 
-                if (!confirm(`Process ${selectedVideoPath.split('/').pop()}?`)) {
-                    return;
-                }
+                const videoName = selectedVideoPath.split('/').pop();
                 
                 try {
                     const response = await fetch('/api/process', {
@@ -595,15 +601,15 @@
                     const data = await response.json();
                     
                     if (data.success) {
-                        alert('Processing started! Check Recent Activity for updates.');
-                        refreshHistory();
+                        alert(`✅ ${videoName} added to processing queue!\n\nThe video will be processed in the background. Visit the Queue page to watch progress.`);
                         selectedVideoPath = null;
                         document.getElementById('searchInput').value = '';
+                        updateQueueCount();
                     } else {
-                        alert('Error: ' + (data.error || 'Processing failed'));
+                        alert('Error: ' + (data.error || 'Failed to add to queue'));
                     }
                 } catch (error) {
-                    alert('Error processing video: ' + error.message);
+                    alert('Error adding to queue: ' + error.message);
                 }
             }
             
@@ -616,14 +622,11 @@
                     return;
                 }
                 
-                if (!confirm(`Process ALL ${unprocessedCount} unprocessed videos?\n\nThis will start a full batch processing job. This may take a long time depending on the number of videos.`)) {
+                if (!confirm(`Queue ${unprocessedCount} video(s) for processing?\n\nAll unprocessed videos will be added to the processing queue and processed in the background.`)) {
                     return;
                 }
                 
                 try {
-                    // Show processing started
-                    alert('Batch processing started! This will run in the background.\n\nRefresh the dashboard to see progress in Recent Activity.');
-                    
                     const response = await fetch('/api/process-all', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' }
@@ -632,15 +635,13 @@
                     const data = await response.json();
                     
                     if (data.success) {
-                        alert(data.message);
-                        refreshStatus();
-                        refreshStatistics();
-                        refreshHistory();
+                        alert(`✅ ${data.queued} video(s) added to processing queue!\n\nVideos will be processed in the background. Visit the Queue page to watch progress.`);
+                        updateQueueCount();
                     } else {
-                        alert('Error: ' + (data.error || 'Processing failed'));
+                        alert('Error: ' + (data.error || 'Failed to add to queue'));
                     }
                 } catch (error) {
-                    alert('Error starting batch processing: ' + error.message);
+                    alert('Error adding to queue: ' + error.message);
                 }
             }
             

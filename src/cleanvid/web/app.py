@@ -10,6 +10,8 @@ from pathlib import Path
 import json
 from datetime import datetime
 from typing import Dict, List, Any
+import threading
+import time
 
 from cleanvid.services.processor import Processor
 from cleanvid.services.config_manager import ConfigManager
@@ -21,6 +23,10 @@ CORS(app)
 # Initialize processor
 processor = None
 
+# Background worker control
+worker_thread = None
+worker_running = False
+
 
 def get_processor():
     """Get or create processor instance."""
@@ -28,6 +34,90 @@ def get_processor():
     if processor is None:
         processor = Processor()
     return processor
+
+
+def background_queue_worker():
+    """Background worker that processes pending queue jobs."""
+    global worker_running
+    
+    print("🔄 Background queue worker started")
+    
+    while worker_running:
+        try:
+            proc = get_processor()
+            
+            # Check if there are pending jobs and no current job
+            if hasattr(proc, 'processing_queue') and proc.processing_queue:
+                queue_status = proc.processing_queue.get_status()
+                
+                # If no current job but pending jobs exist, process next one
+                if not queue_status['current_job'] and queue_status['pending_count'] > 0:
+                    # Get next pending job
+                    next_job = proc.processing_queue.pending_jobs[0]
+                    video_path = Path(next_job.video_path)
+                    
+                    print(f"\n📹 Processing queued video: {video_path.name}")
+                    
+                    # Remove from pending (will be set as current_job by process_video)
+                    proc.processing_queue.pending_jobs.pop(0)
+                    proc.processing_queue._save()
+                    
+                    # Generate output path
+                    output_path = proc.file_manager.generate_output_path(
+                        video_path,
+                        preserve_structure=True
+                    )
+                    
+                    # Ensure output directory exists
+                    proc.file_manager.ensure_output_directory(output_path)
+                    
+                    # Process video (this will call start_job internally)
+                    result = proc.video_processor.process_video(
+                        video_path=video_path,
+                        output_path=output_path,
+                        mute_padding_before_ms=proc.settings.processing.mute_padding_before_ms,
+                        mute_padding_after_ms=proc.settings.processing.mute_padding_after_ms,
+                        auto_download_subtitles=proc.settings.opensubtitles.enabled,
+                        is_batch_mode=False  # Queue jobs are not batch mode
+                    )
+                    
+                    # Mark as processed
+                    proc.file_manager.mark_as_processed(
+                        video_path=video_path,
+                        success=result.success,
+                        segments_muted=result.segments_muted,
+                        error=result.error_message
+                    )
+                    
+                    print(f"✅ Completed: {video_path.name}")
+            
+        except Exception as e:
+            print(f"❌ Queue worker error: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Sleep for 2 seconds before checking again
+        time.sleep(2)
+    
+    print("🛑 Background queue worker stopped")
+
+
+def start_queue_worker():
+    """Start the background queue worker thread."""
+    global worker_thread, worker_running
+    
+    if worker_thread is None or not worker_thread.is_alive():
+        worker_running = True
+        worker_thread = threading.Thread(target=background_queue_worker, daemon=True)
+        worker_thread.start()
+        print("✅ Queue worker thread started")
+
+
+def stop_queue_worker():
+    """Stop the background queue worker thread."""
+    global worker_running
+    worker_running = False
+    print("⏹️  Queue worker stopping...")
 
 
 @app.route('/')
@@ -153,7 +243,7 @@ def api_processing_status():
 
 @app.route('/api/process', methods=['POST'])
 def api_process():
-    """Process a specific video."""
+    """Add a specific video to the processing queue."""
     try:
         data = request.json
         video_path = data.get('video_path')
@@ -168,55 +258,50 @@ def api_process():
         if not video_path.exists():
             return jsonify({'error': f'Video not found: {video_path}'}), 404
         
-        # Process it
-        stats = proc.process_single(video_path)
-        
-        return jsonify({
-            'success': True,
-            'stats': {
-                'total_videos': stats.total_videos,
-                'successful': stats.successful,
-                'failed': stats.failed,
-                'skipped': stats.skipped
-            }
-        })
+        # Add to queue
+        if hasattr(proc, 'processing_queue') and proc.processing_queue:
+            proc.processing_queue.add_pending_jobs([str(video_path)])
+            
+            return jsonify({
+                'success': True,
+                'queued': 1,
+                'message': f'Added {video_path.name} to processing queue. Processing will begin shortly.'
+            })
+        else:
+            return jsonify({'error': 'Processing queue not available'}), 500
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/process-all', methods=['POST'])
 def api_process_all():
-    """Process all unprocessed videos."""
+    """Add all unprocessed videos to the processing queue."""
     try:
         proc = get_processor()
         
-        # Get count of unprocessed videos
-        unprocessed_count = len(proc.file_manager.get_unprocessed_videos())
+        # Get all unprocessed videos
+        unprocessed_videos = proc.file_manager.get_unprocessed_videos()
         
-        if unprocessed_count == 0:
+        if len(unprocessed_videos) == 0:
             return jsonify({
                 'success': True,
-                'message': 'No unprocessed videos found',
-                'stats': {
-                    'total_videos': 0,
-                    'successful': 0,
-                    'failed': 0,
-                    'skipped': 0
-                }
+                'queued': 0,
+                'message': 'No unprocessed videos found'
             })
         
-        # Process all unprocessed videos
-        stats = proc.process_batch(max_videos=unprocessed_count)
-        
-        return jsonify({
-            'success': True,
-            'stats': {
-                'total_videos': stats.total_videos,
-                'successful': stats.successful,
-                'failed': stats.failed,
-                'skipped': stats.skipped
-            },
-            'message': f'Processed {stats.total_videos} videos: {stats.successful} successful, {stats.failed} failed'
-        })
+        # Add all to queue
+        if hasattr(proc, 'processing_queue') and proc.processing_queue:
+            video_paths = [str(v) for v in unprocessed_videos]
+            proc.processing_queue.add_pending_jobs(video_paths)
+            
+            return jsonify({
+                'success': True,
+                'queued': len(video_paths),
+                'message': f'Added {len(video_paths)} video(s) to processing queue. Processing will begin shortly.'
+            })
+        else:
+            return jsonify({'error': 'Processing queue not available'}), 500
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -284,7 +369,7 @@ def api_bypass():
 
 @app.route('/api/bypass-multiple', methods=['POST'])
 def api_bypass_multiple():
-    """Bypass multiple videos by copying to output."""
+    """Add multiple videos to bypass queue for background processing."""
     try:
         data = request.json
         video_paths = data.get('video_paths', [])
@@ -293,15 +378,19 @@ def api_bypass_multiple():
             return jsonify({'error': 'video_paths required'}), 400
         
         proc = get_processor()
-        paths = [Path(p) for p in video_paths]
         
-        result = proc.bypass_multiple_videos(paths)
-        
-        return jsonify({
-            'success': True,
-            'result': result,
-            'message': f"Bypassed {result['successful']} of {result['total']} videos"
-        })
+        # Add all videos to the pending queue
+        if hasattr(proc, 'processing_queue') and proc.processing_queue:
+            proc.processing_queue.add_pending_jobs(video_paths)
+            
+            return jsonify({
+                'success': True,
+                'queued': len(video_paths),
+                'message': f'Added {len(video_paths)} video(s) to bypass queue. Processing will begin shortly.'
+            })
+        else:
+            return jsonify({'error': 'Processing queue not available'}), 500
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -839,7 +928,14 @@ def classify_error(error_msg: str) -> str:
 
 def run_server(host='0.0.0.0', port=8080, debug=False):
     """Run the Flask development server."""
-    app.run(host=host, port=port, debug=debug)
+    # Start background queue worker
+    start_queue_worker()
+    
+    try:
+        app.run(host=host, port=port, debug=debug)
+    finally:
+        # Stop worker on shutdown
+        stop_queue_worker()
 
 
 if __name__ == '__main__':
