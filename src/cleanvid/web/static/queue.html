@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processing Queue - Cleanvid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .pulse-green {
+            animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">Processing Queue</h1>
+                    <p class="text-blue-100">Real-time job status and management</p>
+                </div>
+                <a href="/" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded">← Back to Dashboard</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Current Job -->
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold mb-4">Current Processing</h2>
+            <div id="currentJobSection" class="bg-white rounded-lg shadow-md p-6">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </section>
+
+        <!-- Pending Queue -->
+        <section class="mb-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Pending Queue (<span id="pendingCount">0</span> videos)</h2>
+                <button onclick="clearQueue()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                    Clear All Pending
+                </button>
+            </div>
+            <div id="pendingQueueSection" class="bg-white rounded-lg shadow-md divide-y">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Auto-refresh every 2 seconds
+        setInterval(refreshQueue, 2000);
+        refreshQueue(); // Initial load
+
+        async function refreshQueue() {
+            try {
+                const response = await fetch('/api/queue');
+                const data = await response.json();
+
+                // Update current job
+                renderCurrentJob(data.current_job);
+
+                // Update pending queue
+                renderPendingQueue(data.pending_jobs);
+
+                // Update count
+                document.getElementById('pendingCount').textContent = data.pending_count;
+
+            } catch (error) {
+                console.error('Error fetching queue:', error);
+            }
+        }
+
+        function renderCurrentJob(job) {
+            const container = document.getElementById('currentJobSection');
+
+            if (!job) {
+                container.innerHTML = '<p class="text-gray-500 text-center">No active processing</p>';
+                return;
+            }
+
+            const badges = [];
+            if (job.blur_count > 0) badges.push(`<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">${job.blur_count} blur</span>`);
+            if (job.black_count > 0) badges.push(`<span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">${job.black_count} black</span>`);
+            if (job.skip_count > 0) badges.push(`<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">${job.skip_count} skip</span>`);
+            if (job.profanity_count > 0) badges.push(`<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs">${job.profanity_count} profanity</span>`);
+
+            const batchBadge = job.is_batch_mode 
+                ? '<span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-semibold">🔄 Batch Job</span>'
+                : '';
+
+            container.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-gray-900">${job.video_name}</h3>
+                    <div class="flex gap-2">
+                        ${batchBadge}
+                        <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold animate-pulse">⚙️ Processing</span>
+                    </div>
+                </div>
+                <div class="flex gap-2 mb-4">${badges.join('')}</div>
+                ${job.is_batch_mode ? '<p class="text-sm text-gray-600 mb-4">Running automated batch processing - next video TBD</p>' : ''}
+                <div class="space-y-2">
+                    ${job.steps.map(step => {
+                        let icon, bgClass, textClass;
+                        if (step.status === 'complete') {
+                            icon = '✅';
+                            bgClass = 'bg-green-50';
+                            textClass = 'text-green-700';
+                        } else if (step.status === 'running') {
+                            icon = '▶️';
+                            bgClass = 'bg-blue-50';
+                            textClass = 'text-blue-700 font-semibold';
+                        } else if (step.status === 'failed') {
+                            icon = '❌';
+                            bgClass = 'bg-red-50';
+                            textClass = 'text-red-700';
+                        } else {
+                            icon = '⏳';
+                            bgClass = 'bg-gray-50';
+                            textClass = 'text-gray-500';
+                        }
+                        return `
+                            <div class="flex items-center gap-3 p-3 rounded ${bgClass}">
+                                <span class="text-xl">${icon}</span>
+                                <span class="${textClass}">${step.name}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        function renderPendingQueue(jobs) {
+            const container = document.getElementById('pendingQueueSection');
+
+            if (!jobs || jobs.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center p-6">No pending videos in queue</p>';
+                return;
+            }
+
+            container.innerHTML = jobs.map((job, index) => {
+                const badges = [];
+                if (job.blur_count > 0) badges.push(`<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">${job.blur_count} blur</span>`);
+                if (job.black_count > 0) badges.push(`<span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">${job.black_count} black</span>`);
+                if (job.skip_count > 0) badges.push(`<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">${job.skip_count} skip</span>`);
+                if (job.profanity_count > 0) badges.push(`<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs">${job.profanity_count} profanity</span>`);
+
+                const hasSceneFilters = job.blur_count > 0 || job.black_count > 0 || job.skip_count > 0;
+                const editButton = hasSceneFilters 
+                    ? `<a href="/scene_editor.html?video=${encodeURIComponent(job.video_path)}" class="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm">Edit Scenes</a>`
+                    : '';
+
+                return `
+                    <div class="p-4 hover:bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="font-semibold text-gray-900">#${index + 1} - ${job.video_name}</div>
+                                <div class="flex gap-2 mt-2">${badges.join('')}</div>
+                            </div>
+                            <div class="flex gap-2">
+                                ${editButton}
+                                <button onclick="removeFromQueue(${index})" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function removeFromQueue(index) {
+            if (!confirm('Remove this video from the queue?')) return;
+
+            try {
+                const response = await fetch(`/api/queue/${index}`, { method: 'DELETE' });
+                const data = await response.json();
+
+                if (data.success) {
+                    refreshQueue();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to remove from queue'));
+                }
+            } catch (error) {
+                alert('Error removing from queue: ' + error.message);
+            }
+        }
+
+        async function clearQueue() {
+            if (!confirm('Clear ALL pending videos from the queue?')) return;
+
+            try {
+                const response = await fetch('/api/queue');
+                const data = await response.json();
+
+                // Delete all pending jobs
+                for (let i = data.pending_count - 1; i >= 0; i--) {
+                    await fetch(`/api/queue/${i}`, { method: 'DELETE' });
+                }
+
+                alert('Queue cleared!');
+                refreshQueue();
+            } catch (error) {
+                alert('Error clearing queue: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
