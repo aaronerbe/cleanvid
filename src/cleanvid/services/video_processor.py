@@ -96,7 +96,8 @@ class VideoProcessor:
         output_path: Path,
         mute_padding_before_ms: int = 500,
         mute_padding_after_ms: int = 500,
-        auto_download_subtitles: bool = True
+        auto_download_subtitles: bool = True,
+        is_batch_mode: bool = False
     ) -> ProcessingResult:
         """
         Process a video file to mute profanity.
@@ -107,6 +108,7 @@ class VideoProcessor:
             mute_padding_before_ms: Padding before detected word (milliseconds).
             mute_padding_after_ms: Padding after detected word (milliseconds).
             auto_download_subtitles: If True, downloads subtitles if missing.
+            is_batch_mode: If True, marks this as part of an automated batch job.
         
         Returns:
             ProcessingResult with processing details.
@@ -261,7 +263,8 @@ class VideoProcessor:
                     blur=blur_count,
                     black=black_count,
                     skip=skip_count,
-                    profanity=profanity_count
+                    profanity=profanity_count,
+                    is_batch_mode=is_batch_mode
                 )
             
             # Step 5: Process video with FFmpeg
@@ -425,6 +428,15 @@ class VideoProcessor:
                 result.output_path = output_path
                 result.scene_zones_processed = scene_zones_applied
                 result.has_custom_scenes = (scene_zones_applied > 0)
+                
+                # Step 6: Copy and adjust SRT file
+                self._copy_and_adjust_srt(
+                    video_path=video_path,
+                    output_path=output_path,
+                    subtitle_file=subtitle_file,
+                    skip_zones=skip_zones if skip_zones else []
+                )
+                
                 result.mark_complete(success=True)
                 if scene_zones_applied > 0:
                     result.add_warning(f"Applied {scene_zones_applied} scene filter(s)")
@@ -535,6 +547,59 @@ class VideoProcessor:
         except Exception as e:
             print(f"  Error processing with scene filters: {e}")
             return False
+    
+    def _copy_and_adjust_srt(
+        self,
+        video_path: Path,
+        output_path: Path,
+        subtitle_file,
+        skip_zones: List
+    ) -> None:
+        """
+        Copy SRT file to output directory and adjust timing if skip zones exist.
+        
+        Args:
+            video_path: Original video path
+            output_path: Output video path
+            subtitle_file: SubtitleFile object from subtitle manager
+            skip_zones: List of SkipZone objects that were applied
+        """
+        try:
+            # Find the SRT file path
+            srt_path = self.subtitle_manager.find_subtitle_for_video(video_path)
+            
+            if not srt_path:
+                print(f"  ℹ️  No SRT file found to copy")
+                return
+            
+            # Generate output SRT path (same name as output video, .srt extension)
+            output_srt = output_path.with_suffix('.srt')
+            
+            # If we have skip zones, adjust timing
+            if skip_zones and len(skip_zones) > 0:
+                print(f"  📝 Adjusting SRT timing for {len(skip_zones)} skip zone(s)...")
+                
+                # Import the timing adjuster
+                from cleanvid.utils.srt_timing import SRTTimingAdjuster
+                
+                # Convert skip zones to (start, end) tuples in seconds
+                skip_ranges = [(zone.start_time, zone.end_time) for zone in skip_zones]
+                
+                # Adjust and save SRT
+                SRTTimingAdjuster.adjust_srt_for_skip_zones(
+                    srt_path=srt_path,
+                    output_path=output_srt,
+                    skip_zones=skip_ranges
+                )
+            else:
+                # No skip zones - just copy SRT as-is
+                print(f"  📝 Copying SRT file to output...")
+                shutil.copy2(srt_path, output_srt)
+                print(f"  ✓ SRT copied: {output_srt.name}")
+        
+        except Exception as e:
+            print(f"  ⚠️  Warning: Failed to copy/adjust SRT: {e}")
+            # Don't fail the entire processing job if SRT copy fails
     
     def can_process(self, video_path: Path) -> tuple[bool, Optional[str]]:
         """

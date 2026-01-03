@@ -44,6 +44,7 @@ class ProcessingJob:
         black_count: Number of black filters
         skip_count: Number of skip zones
         profanity_count: Number of profanity segments
+        is_batch_mode: Whether this is part of an automated batch job
     """
     video_path: str
     video_name: str
@@ -57,6 +58,9 @@ class ProcessingJob:
     black_count: int = 0
     skip_count: int = 0
     profanity_count: int = 0
+    
+    # Batch mode indicator
+    is_batch_mode: bool = False
 
 
 class ProcessingQueue:
@@ -91,7 +95,8 @@ class ProcessingQueue:
         blur: int = 0,
         black: int = 0,
         skip: int = 0,
-        profanity: int = 0
+        profanity: int = 0,
+        is_batch_mode: bool = False
     ) -> None:
         """
         Start a new processing job.
@@ -104,6 +109,7 @@ class ProcessingQueue:
             black: Number of black filters to apply
             skip: Number of skip zones to cut
             profanity: Number of profanity segments to mute
+            is_batch_mode: Whether this is part of an automated batch job
         """
         # Create new job
         job = ProcessingJob(
@@ -114,7 +120,8 @@ class ProcessingQueue:
             blur_count=blur,
             black_count=black,
             skip_count=skip,
-            profanity_count=profanity
+            profanity_count=profanity,
+            is_batch_mode=is_batch_mode
         )
         
         # Determine processing steps based on what needs to be done
@@ -190,8 +197,35 @@ class ProcessingQueue:
         
         self._save()
         
-        # Clear current job after saving
+        # Clear current job - Processor will call start_job() for next video
         self.current_job = None
+        self._save()
+    
+    def add_pending_jobs(self, video_paths: List[str]) -> None:
+        """
+        Add multiple videos to the pending queue.
+        
+        Use this for pre-loading the queue when you know all videos to process.
+        
+        Args:
+            video_paths: List of video file paths to queue
+        """
+        for video_path in video_paths:
+            job = ProcessingJob(
+                video_path=video_path,
+                video_name=Path(video_path).name,
+                status="pending",
+                is_batch_mode=False  # Pre-loaded queue is not batch mode
+            )
+            self.pending_jobs.append(job)
+        
+        self._save()
+    
+    def clear_pending_jobs(self) -> None:
+        """
+        Clear all pending jobs from the queue.
+        """
+        self.pending_jobs = []
         self._save()
     
     def get_status(self) -> dict:
@@ -209,7 +243,7 @@ class ProcessingQueue:
         return {
             "current_job": current_job_dict,
             "pending_count": len(self.pending_jobs),
-            "pending_jobs": [asdict(job) for job in self.pending_jobs[:5]]  # First 5 only
+            "pending_jobs": [asdict(job) for job in self.pending_jobs]  # Return all jobs
         }
     
     def _save(self) -> None:
@@ -247,8 +281,29 @@ class ProcessingQueue:
                         blur_count=job_data.get('blur_count', 0),
                         black_count=job_data.get('black_count', 0),
                         skip_count=job_data.get('skip_count', 0),
-                        profanity_count=job_data.get('profanity_count', 0)
+                        profanity_count=job_data.get('profanity_count', 0),
+                        is_batch_mode=job_data.get('is_batch_mode', False)
                     )
+                
+                # Restore pending jobs if present
+                if data.get('pending_jobs'):
+                    self.pending_jobs = []
+                    for job_data in data['pending_jobs']:
+                        steps = [JobStep(**step) for step in job_data.get('steps', [])]
+                        job = ProcessingJob(
+                            video_path=job_data['video_path'],
+                            video_name=job_data['video_name'],
+                            status=job_data['status'],
+                            steps=steps,
+                            started_at=job_data.get('started_at'),
+                            completed_at=job_data.get('completed_at'),
+                            blur_count=job_data.get('blur_count', 0),
+                            black_count=job_data.get('black_count', 0),
+                            skip_count=job_data.get('skip_count', 0),
+                            profanity_count=job_data.get('profanity_count', 0),
+                            is_batch_mode=job_data.get('is_batch_mode', False)
+                        )
+                        self.pending_jobs.append(job)
         except Exception as e:
             # If load fails, start with clean state
             print(f"Warning: Failed to load processing status: {e}")

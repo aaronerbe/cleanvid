@@ -125,25 +125,30 @@
                             </svg>
                         </div>
                     </div>
-                    <!-- Processing Queue Status Widget -->
-                    <div id="processingQueueWidget" class="col-span-full bg-white rounded-lg shadow-md p-6">
-                        <div id="processingIdle" class="text-center text-gray-500">
-                            <p class="text-sm">No active processing</p>
+                    <!-- Processing Status -->
+                    <div class="stat-card bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Processing</p>
+                                <p id="processingState" class="text-2xl font-bold text-gray-600">Idle</p>
+                            </div>
+                            <svg id="processingIcon" class="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
                         </div>
-                        
-                        <div id="processingActive" class="hidden">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-bold">⚙️ Processing Status</h3>
-                                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold animate-pulse">Active</span>
+                    </div>
+                    
+                    <!-- Queue Status - CLICKABLE -->
+                    <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="window.location.href='/queue.html'">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Processing Queue</p>
+                                <p id="queueCount" class="text-2xl font-bold text-blue-600">0</p>
+                                <p class="text-xs text-blue-600 mt-1">Click to view</p>
                             </div>
-                            
-                            <div id="currentJobInfo" class="mb-4">
-                                <!-- Current job details -->
-                            </div>
-                            
-                            <div id="processingSteps" class="space-y-2">
-                                <!-- Processing steps -->
-                            </div>
+                            <svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                            </svg>
                         </div>
                     </div>
                 </div>
@@ -355,82 +360,22 @@
             refreshStatistics();
             refreshHistory();
             refreshFailures();
+            updateQueueCount();
             
-            // Processing Queue Polling
-            async function updateProcessingStatus() {
+            // Update queue count every 2 seconds
+            setInterval(updateQueueCount, 2000);
+            
+            async function updateQueueCount() {
                 try {
-                    const response = await fetch('/api/processing/status');
+                    const response = await fetch('/api/queue');
                     const data = await response.json();
                     
-                    const idleDiv = document.getElementById('processingIdle');
-                    const activeDiv = document.getElementById('processingActive');
-                    
-                    if (!data.current_job) {
-                        // No active job
-                        idleDiv.classList.remove('hidden');
-                        activeDiv.classList.add('hidden');
-                        return;
-                    }
-                    
-                    // Active job found
-                    idleDiv.classList.add('hidden');
-                    activeDiv.classList.remove('hidden');
-                    
-                    const job = data.current_job;
-                    
-                    // Update current job info
-                    const jobInfoDiv = document.getElementById('currentJobInfo');
-                    
-                    const badges = [];
-                    if (job.blur_count > 0) badges.push(`<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">${job.blur_count} blur</span>`);
-                    if (job.black_count > 0) badges.push(`<span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">${job.black_count} black</span>`);
-                    if (job.skip_count > 0) badges.push(`<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">${job.skip_count} skip</span>`);
-                    if (job.profanity_count > 0) badges.push(`<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs">${job.profanity_count} profanity</span>`);
-                    
-                    jobInfoDiv.innerHTML = `
-                        <div class="font-semibold text-gray-900">${job.video_name}</div>
-                        <div class="flex gap-2 mt-2">${badges.join('')}</div>
-                    `;
-                    
-                    // Update steps
-                    const stepsDiv = document.getElementById('processingSteps');
-                    stepsDiv.innerHTML = job.steps.map(step => {
-                        let icon, bgClass, textClass;
-                        
-                        if (step.status === 'complete') {
-                            icon = '✅';
-                            bgClass = 'bg-green-50';
-                            textClass = 'text-green-700';
-                        } else if (step.status === 'running') {
-                            icon = '▶️';
-                            bgClass = 'bg-blue-50';
-                            textClass = 'text-blue-700 font-semibold';
-                        } else if (step.status === 'failed') {
-                            icon = '❌';
-                            bgClass = 'bg-red-50';
-                            textClass = 'text-red-700';
-                        } else {
-                            icon = '⏳';
-                            bgClass = 'bg-gray-50';
-                            textClass = 'text-gray-500';
-                        }
-                        
-                        return `
-                            <div class="flex items-center gap-3 p-3 rounded ${bgClass}">
-                                <span class="text-xl">${icon}</span>
-                                <span class="${textClass}">${step.name}</span>
-                            </div>
-                        `;
-                    }).join('');
-                    
+                    const total = data.pending_count + (data.current_job ? 1 : 0);
+                    document.getElementById('queueCount').textContent = total;
                 } catch (error) {
-                    console.error('Error fetching processing status:', error);
+                    console.error('Error fetching queue count:', error);
                 }
             }
-            
-            // Poll every 2 seconds
-            setInterval(updateProcessingStatus, 2000);
-            updateProcessingStatus(); // Initial call
             
             async function refreshStatus() {
                 try {
@@ -447,14 +392,14 @@
                     document.getElementById('ffmpegStatus').textContent = data.ffmpeg_available ? 'Available' : 'Not Found';
                     document.getElementById('wordCount').textContent = data.word_count || '--';
                     
-                    // Check processing status
-                    const procResponse = await fetch('/api/processing-status');
-                    const procData = await procResponse.json();
+                    // Check if processing is active
+                    const queueResponse = await fetch('/api/queue');
+                    const queueData = await queueResponse.json();
                     
                     const stateElement = document.getElementById('processingState');
                     const iconElement = document.getElementById('processingIcon');
                     
-                    if (procData.is_processing) {
+                    if (queueData.current_job) {
                         stateElement.textContent = 'Active';
                         stateElement.className = 'text-2xl font-bold text-green-600 pulse-green';
                         iconElement.className = 'w-12 h-12 text-green-500 animate-spin';

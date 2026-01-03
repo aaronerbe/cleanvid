@@ -143,7 +143,8 @@ class Processor:
                     output_path=output_path,
                     mute_padding_before_ms=self.settings.processing.mute_padding_before_ms,
                     mute_padding_after_ms=self.settings.processing.mute_padding_after_ms,
-                    auto_download_subtitles=self.settings.opensubtitles.enabled
+                    auto_download_subtitles=self.settings.opensubtitles.enabled,
+                    is_batch_mode=True  # Mark as batch job
                 )
 
                 # Add result to statistics

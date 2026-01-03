@@ -36,6 +36,12 @@ def index():
     return send_from_directory('static', 'dashboard.html')
 
 
+@app.route('/queue.html')
+def queue_page():
+    """Serve the queue HTML."""
+    return send_from_directory('static', 'queue.html')
+
+
 @app.route('/api/status')
 def api_status():
     """Get current system status."""
@@ -321,6 +327,50 @@ def api_search():
         return jsonify({
             'matches': matches[:20],  # Limit to 20 results
             'total': len(matches)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/queue')
+def api_get_queue():
+    """Get processing queue status."""
+    try:
+        proc = get_processor()
+        
+        if hasattr(proc, 'processing_queue') and proc.processing_queue:
+            status = proc.processing_queue.get_status()
+            return jsonify(status)
+        else:
+            return jsonify({
+                'current_job': None,
+                'pending_count': 0,
+                'pending_jobs': []
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/queue/<int:job_index>', methods=['DELETE'])
+def api_delete_queue_job(job_index):
+    """Delete a job from the pending queue."""
+    try:
+        proc = get_processor()
+        
+        if not hasattr(proc, 'processing_queue') or not proc.processing_queue:
+            return jsonify({'error': 'Queue not available'}), 404
+        
+        # Check if job_index is valid
+        if job_index < 0 or job_index >= len(proc.processing_queue.pending_jobs):
+            return jsonify({'error': 'Invalid job index'}), 404
+        
+        # Remove the job
+        removed_job = proc.processing_queue.pending_jobs.pop(job_index)
+        proc.processing_queue._save()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Removed {removed_job.video_name} from queue'
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
