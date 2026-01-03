@@ -31,7 +31,8 @@ class VideoProcessor:
         profanity_detector: ProfanityDetector,
         ffmpeg_config: FFmpegConfig,
         ffmpeg_wrapper: Optional[FFmpegWrapper] = None,
-        config_dir: Optional[Path] = None
+        config_dir: Optional[Path] = None,
+        processing_queue: Optional['ProcessingQueue'] = None
     ):
         """
         Initialize VideoProcessor.
@@ -42,12 +43,14 @@ class VideoProcessor:
             ffmpeg_config: FFmpeg configuration.
             ffmpeg_wrapper: Optional FFmpegWrapper instance (creates default if None).
             config_dir: Optional config directory path for scene filters.
+            processing_queue: Optional ProcessingQueue for status tracking.
         """
         self.subtitle_manager = subtitle_manager
         self.profanity_detector = profanity_detector
         self.ffmpeg_config = ffmpeg_config
         self.ffmpeg = ffmpeg_wrapper or FFmpegWrapper()
         self.config_dir = config_dir
+        self.queue = processing_queue
     
     def extract_metadata(self, video_path: Path) -> VideoMetadata:
         """
@@ -140,6 +143,11 @@ class VideoProcessor:
             # Step 2.5: Load and integrate scene filters
             video_filter_complex = None
             scene_zones_applied = 0
+            
+            # Initialize scene filter counters for queue tracking
+            blur_zones = []
+            black_zones = []
+            skip_zones = []
             
             print(f"  🔍 DEBUG: Checking for scene filters...")
             print(f"  🔍 DEBUG: config_dir = {self.config_dir}")
@@ -241,6 +249,21 @@ class VideoProcessor:
             # Step 4: Create FFmpeg filter chain for audio muting
             audio_filter_chain = create_ffmpeg_filter_chain(padded_segments)
             
+            # Count filters and start queue tracking
+            blur_count = len(blur_zones)
+            black_count = len(black_zones)
+            skip_count = len(skip_zones)
+            profanity_count = len(padded_segments)
+            
+            if self.queue:
+                self.queue.start_job(
+                    video_path=str(video_path),
+                    blur=blur_count,
+                    black=black_count,
+                    skip=skip_count,
+                    profanity=profanity_count
+                )
+            
             # Step 5: Process video with FFmpeg
             # Two-pass approach: BLUR/BLACK first, then SKIP cuts
             
@@ -269,6 +292,10 @@ class VideoProcessor:
                 else:
                     pass1_output = output_path
                 
+                # Update queue: starting Pass 1
+                if self.queue:
+                    self.queue.update_step(0, "running")
+                
                 # Process with blur/black filters
                 success = self._process_with_scene_filters(
                     input_path=video_path,
@@ -283,6 +310,10 @@ class VideoProcessor:
                     result.mark_complete(success=False, error="Pass 1 (BLUR/BLACK) failed")
                     return result
                 
+                # Update queue: Pass 1 complete
+                if self.queue:
+                    self.queue.update_step(0, "complete" if success else "failed")
+                
                 # Pass 2: SKIP cuts (if needed)
                 if skip_zones:
                     print(f"  🔄 Two-pass processing: Pass 2 (SKIP cuts)")
@@ -296,6 +327,10 @@ class VideoProcessor:
                     
                     # Generate skip filter
                     skip_filter = scene_proc.generate_skip_filter(skip_zones, duration)
+                    
+                    # Update queue: starting Pass 2
+                    if self.queue:
+                        self.queue.update_step(1, "running")
                     
                     # Apply skip cuts to temp file
                     success = self._process_with_scene_filters(
@@ -317,6 +352,10 @@ class VideoProcessor:
                         result.mark_complete(success=False, error="Pass 2 (SKIP) failed")
                         return result
                     
+                    # Update queue: Pass 2 complete
+                    if self.queue:
+                        self.queue.update_step(1, "complete" if success else "failed")
+                    
                     scene_zones_applied += len(skip_zones)
                     print(f"  ✅ Cut out {len(skip_zones)} scene(s) - output is shorter")
             
@@ -334,6 +373,10 @@ class VideoProcessor:
                 # Generate skip filter
                 skip_filter = scene_proc.generate_skip_filter(skip_zones, duration)
                 
+                # Update queue: starting SKIP processing
+                if self.queue:
+                    self.queue.update_step(0, "running")
+                
                 # Apply skip cuts
                 success = self._process_with_scene_filters(
                     input_path=video_path,
@@ -348,11 +391,19 @@ class VideoProcessor:
                     result.mark_complete(success=False, error="SKIP processing failed")
                     return result
                 
+                # Update queue: SKIP complete
+                if self.queue:
+                    self.queue.update_step(0, "complete" if success else "failed")
+                
                 scene_zones_applied += len(skip_zones)
                 print(f"  ✅ Cut out {len(skip_zones)} scene(s) - output is shorter")
             
             # No scene filters at all - standard profanity muting
             else:
+                # Update queue: starting profanity muting
+                if self.queue:
+                    self.queue.update_step(0, "running")
+                
                 # Standard audio-only processing
                 success = self.ffmpeg.mute_audio(
                     input_path=video_path,
@@ -365,6 +416,10 @@ class VideoProcessor:
                     video_codec=self.ffmpeg_config.video_codec,
                     video_crf=self.ffmpeg_config.video_crf
                 )
+                
+                # Update queue: profanity muting complete
+                if self.queue:
+                    self.queue.update_step(0, "complete" if success else "failed")
             
             if success:
                 result.output_path = output_path
@@ -375,9 +430,16 @@ class VideoProcessor:
                     result.add_warning(f"Applied {scene_zones_applied} scene filter(s)")
             else:
                 result.mark_complete(success=False, error="FFmpeg processing failed")
+            
+            # Complete queue job
+            if self.queue:
+                self.queue.complete_job(success=result.success)
         
         except Exception as e:
             result.mark_complete(success=False, error=str(e))
+            # Complete queue job on error
+            if self.queue:
+                self.queue.complete_job(success=False)
         
         return result
     

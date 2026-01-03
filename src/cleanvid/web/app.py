@@ -326,6 +326,27 @@ def api_search():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/processing/status')
+def api_get_processing_status():
+    """Get current processing queue status."""
+    try:
+        proc = get_processor()
+        
+        # Get queue status from processing queue
+        if hasattr(proc, 'processing_queue') and proc.processing_queue:
+            status = proc.processing_queue.get_status()
+            return jsonify(status)
+        else:
+            # No queue available - return empty status
+            return jsonify({
+                'current_job': None,
+                'pending_count': 0,
+                'pending_jobs': []
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/browse')
 def api_browse():
     """Browse filesystem for videos."""

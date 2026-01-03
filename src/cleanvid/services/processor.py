@@ -50,11 +50,18 @@ class Processor:
             word_list_path=self.settings.get_word_list_path()
         )
 
+        # Initialize processing queue
+        from cleanvid.services.processing_queue import ProcessingQueue
+        self.processing_queue = ProcessingQueue(
+            config_dir=self.settings.paths.config_dir
+        )
+        
         self.video_processor = VideoProcessor(
             subtitle_manager=self.subtitle_manager,
             profanity_detector=self.profanity_detector,
             ffmpeg_config=self.settings.ffmpeg,
-            config_dir=self.settings.paths.config_dir
+            config_dir=self.settings.paths.config_dir,
+            processing_queue=self.processing_queue
         )
 
     def process_batch(
