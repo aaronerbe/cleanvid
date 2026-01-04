@@ -442,7 +442,7 @@ class FileManager:
     def bypass_video(self, video_path: Path) -> bool:
         """
         Bypass processing by copying video directly to output.
-        Updates existing failed entry to show success with bypass message.
+        Marks video as successfully processed without any error message.
         
         Args:
             video_path: Path to input video file.
@@ -481,10 +481,10 @@ class FileManager:
                     updated = False
                     for entry in entries:
                         if entry.get('video_path') == video_str:
-                            # Update to success with bypass note
+                            # Update to success WITHOUT error message
                             entry['success'] = True
                             entry['segments_muted'] = 0
-                            entry['error'] = 'Bypassed - copied directly to output'
+                            entry['error'] = None  # No error - this was intentional bypass
                             entry['timestamp'] = datetime.now().isoformat()
                             updated = True
                             break
@@ -496,7 +496,7 @@ class FileManager:
                             'timestamp': datetime.now().isoformat(),
                             'success': True,
                             'segments_muted': 0,
-                            'error': 'Bypassed - copied directly to output'
+                            'error': None  # No error - this was intentional bypass
                         })
                     
                     # Add to processed set
@@ -515,7 +515,7 @@ class FileManager:
                     video_path=video_path,
                     success=True,
                     segments_muted=0,
-                    error='Bypassed - copied directly to output'
+                    error=None  # No error
                 )
             
             return True

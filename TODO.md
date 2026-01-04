@@ -227,6 +227,12 @@
 ## Future Enhancements (Post-v1.0)
 
 ### High Priority
+- [ ] Add queue editing capability
+  - [ ] Add edit button to queue page UI
+  - [ ] Allow editing pending jobs (change job_type, priority, etc.)
+  - [ ] Add API endpoint `/api/queue/<int:job_index>` (PUT method)
+  - [ ] Update queue.html to support inline editing
+  - **Current workaround:** Remove from queue and re-add with correct settings
 - [ ] Add `cleanvid reset --filter failed` command
   - [ ] Enhance `reset` command to accept `--filter` option
   - [ ] Support filtering by status: `failed`, `success`, `all`
