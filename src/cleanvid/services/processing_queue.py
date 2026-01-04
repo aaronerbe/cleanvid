@@ -45,6 +45,7 @@ class ProcessingJob:
         skip_count: Number of skip zones
         profanity_count: Number of profanity segments
         is_batch_mode: Whether this is part of an automated batch job
+        job_type: Type of job - "process" or "bypass"
     """
     video_path: str
     video_name: str
@@ -61,6 +62,9 @@ class ProcessingJob:
     
     # Batch mode indicator
     is_batch_mode: bool = False
+    
+    # Job type: "process" or "bypass"
+    job_type: str = "process"
 
 
 class ProcessingQueue:
@@ -282,7 +286,8 @@ class ProcessingQueue:
                         black_count=job_data.get('black_count', 0),
                         skip_count=job_data.get('skip_count', 0),
                         profanity_count=job_data.get('profanity_count', 0),
-                        is_batch_mode=job_data.get('is_batch_mode', False)
+                        is_batch_mode=job_data.get('is_batch_mode', False),
+                        job_type=job_data.get('job_type', 'process')  # Restore job_type
                     )
                 
                 # Restore pending jobs if present
@@ -301,7 +306,8 @@ class ProcessingQueue:
                             black_count=job_data.get('black_count', 0),
                             skip_count=job_data.get('skip_count', 0),
                             profanity_count=job_data.get('profanity_count', 0),
-                            is_batch_mode=job_data.get('is_batch_mode', False)
+                            is_batch_mode=job_data.get('is_batch_mode', False),
+                            job_type=job_data.get('job_type', 'process')  # Restore job_type
                         )
                         self.pending_jobs.append(job)
         except Exception as e:

@@ -55,72 +55,61 @@ def background_queue_worker():
                     # Get next pending job
                     next_job = proc.processing_queue.pending_jobs[0]
                     video_path = Path(next_job.video_path)
+                    job_type = getattr(next_job, 'job_type', 'process')  # Default to 'process' for backwards compat
                     
-                    print(f"\n📹 Processing queued video: {video_path.name}")
+                    print(f"\n📹 Processing queued video: {video_path.name} (type: {job_type})")
                     
-                    # Check if this is a bypass job (no filters at all)
-                    is_bypass = (next_job.blur_count == 0 and 
-                                next_job.black_count == 0 and 
-                                next_job.skip_count == 0 and 
-                                next_job.profanity_count == 0)
-                    
-                    # Remove from pending and create current job
+                    # Remove from pending
                     proc.processing_queue.pending_jobs.pop(0)
+                    proc.processing_queue._save()
                     
-                    if is_bypass:
-                        # BYPASS: Just copy the file directly
-                        print(f"  ➡️  Bypassing (copying without processing)")
+                    if job_type == "bypass":
+                        # BYPASS: Copy without processing
+                        print(f"  ➡️  Bypassing - copying to output without filters")
                         
-                        # Create a simple job for tracking
                         from cleanvid.services.processing_queue import ProcessingJob, JobStep
                         job = ProcessingJob(
                             video_path=str(video_path),
                             video_name=video_path.name,
                             status="processing",
                             started_at=datetime.now().isoformat(),
-                            steps=[JobStep(name="Copying video to output", status="running")]
+                            steps=[JobStep(name="Copying video to output", status="running")],
+                            job_type="bypass"
                         )
                         proc.processing_queue.current_job = job
                         proc.processing_queue._save()
                         
-                        # Bypass the video
                         success = proc.bypass_video(video_path)
                         
-                        # Update job status
                         job.steps[0].status = "complete" if success else "failed"
                         job.status = "complete" if success else "failed"
                         job.completed_at = datetime.now().isoformat()
                         proc.processing_queue._save()
                         
-                        # Clear current job
                         proc.processing_queue.current_job = None
                         proc.processing_queue._save()
                         
                         print(f"✅ Bypassed: {video_path.name}")
                     else:
-                        # PROCESS: Full processing with filters
-                        proc.processing_queue._save()
+                        # PROCESS: Normal flow (detects profanity, applies scene filters)
+                        print(f"  ⚙️  Processing - will detect profanity and apply any scene filters")
                         
-                        # Generate output path
                         output_path = proc.file_manager.generate_output_path(
                             video_path,
                             preserve_structure=True
                         )
                         
-                        # Ensure output directory exists
                         proc.file_manager.ensure_output_directory(output_path)
                         
-                        # Process video (this will call start_job internally)
                         result = proc.video_processor.process_video(
                             video_path=video_path,
                             output_path=output_path,
                             mute_padding_before_ms=proc.settings.processing.mute_padding_before_ms,
                             mute_padding_after_ms=proc.settings.processing.mute_padding_after_ms,
                             auto_download_subtitles=proc.settings.opensubtitles.enabled,
-                            is_batch_mode=False  # Queue jobs are not batch mode
+                            is_batch_mode=False
                         )
                         
-                        # Mark as processed
                         proc.file_manager.mark_as_processed(
                             video_path=video_path,
                             success=result.success,
@@ -138,8 +127,7 @@ def background_queue_worker():
             try:
                 proc = get_processor()
                 if hasattr(proc, 'processing_queue') and proc.processing_queue:
-                    proc.processing_queue.current_job = None
-                    proc.processing_queue._save()
+                    proc.processing_queue.complete_job(success=False)
             except:
                 pass
         
@@ -426,9 +414,22 @@ def api_bypass_multiple():
         
         proc = get_processor()
         
-        # Add all videos to the pending queue
+        # Add all videos to the pending queue as BYPASS jobs
         if hasattr(proc, 'processing_queue') and proc.processing_queue:
-            proc.processing_queue.add_pending_jobs(video_paths)
+            from cleanvid.services.processing_queue import ProcessingJob
+            from pathlib import Path
+            
+            for video_path in video_paths:
+                job = ProcessingJob(
+                    video_path=video_path,
+                    video_name=Path(video_path).name,
+                    status="pending",
+                    is_batch_mode=False,
+                    job_type="bypass"  # Mark as bypass job
+                )
+                proc.processing_queue.pending_jobs.append(job)
+            
+            proc.processing_queue._save()
             
             return jsonify({
                 'success': True,
