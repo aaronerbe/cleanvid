@@ -556,7 +556,7 @@ class VideoProcessor:
         skip_zones: List
     ) -> None:
         """
-        Copy SRT file to output directory and adjust timing if skip zones exist.
+        Copy SRT file to output directory, redact profanity, and adjust timing if skip zones exist.
         
         Args:
             video_path: Original video path
@@ -575,9 +575,17 @@ class VideoProcessor:
             # Generate output SRT path (same name as output video, .srt extension)
             output_srt = output_path.with_suffix('.srt')
             
-            # If we have skip zones, adjust timing
+            # Step 1: Redact profanity from subtitle file
+            print(f"  📝 Redacting profanity from SRT...")
+            redacted_subtitle = self._redact_profanity_in_subtitle(subtitle_file)
+            
+            # Step 2: If we have skip zones, adjust timing
             if skip_zones and len(skip_zones) > 0:
                 print(f"  📝 Adjusting SRT timing for {len(skip_zones)} skip zone(s)...")
+                
+                # Save redacted SRT to temporary file first
+                temp_srt = output_srt.parent / f"{output_srt.stem}_temp.srt"
+                redacted_subtitle.save(temp_srt)
                 
                 # Import the timing adjuster
                 from cleanvid.utils.srt_timing import SRTTimingAdjuster
@@ -585,21 +593,91 @@ class VideoProcessor:
                 # Convert skip zones to (start, end) tuples in seconds
                 skip_ranges = [(zone.start_time, zone.end_time) for zone in skip_zones]
                 
-                # Adjust and save SRT
+                # Adjust timing and save to final output
                 SRTTimingAdjuster.adjust_srt_for_skip_zones(
-                    srt_path=srt_path,
+                    srt_path=temp_srt,
                     output_path=output_srt,
                     skip_zones=skip_ranges
                 )
+                
+                # Clean up temp file
+                try:
+                    temp_srt.unlink()
+                except:
+                    pass
             else:
-                # No skip zones - just copy SRT as-is
-                print(f"  📝 Copying SRT file to output...")
-                shutil.copy2(srt_path, output_srt)
-                print(f"  ✓ SRT copied: {output_srt.name}")
+                # No skip zones - just save redacted SRT
+                redacted_subtitle.save(output_srt)
+                print(f"  ✓ Redacted SRT saved: {output_srt.name}")
         
         except Exception as e:
             print(f"  ⚠️  Warning: Failed to copy/adjust SRT: {e}")
             # Don't fail the entire processing job if SRT copy fails
+    
+    def _redact_profanity_in_subtitle(self, subtitle_file):
+        """
+        Redact profanity in subtitle by replacing each letter with underscore.
+        
+        Args:
+            subtitle_file: SubtitleFile object with entries
+        
+        Returns:
+            New SubtitleFile with profanity redacted
+        """
+        from cleanvid.models.subtitle import SubtitleFile, SubtitleEntry
+        import re
+        
+        # Get profanity word list from detector
+        profanity_patterns = self.profanity_detector.word_list
+        
+        # Create new subtitle file with redacted entries
+        redacted_entries = []
+        
+        for entry in subtitle_file.entries:
+            redacted_text = entry.text
+            
+            # Check each profanity pattern
+            for pattern in profanity_patterns:
+                # Convert wildcard pattern to regex if needed
+                if '*' in pattern or '?' in pattern:
+                    # Wildcard pattern
+                    regex_pattern = pattern.replace('*', r'\S*').replace('?', r'\S')
+                    regex = re.compile(r'\b' + regex_pattern + r'\b', re.IGNORECASE)
+                    
+                    # Find all matches
+                    matches = regex.finditer(redacted_text)
+                    for match in matches:
+                        matched_word = match.group(0)
+                        # Replace each letter with underscore, preserve spaces and punctuation
+                        redacted_word = ''.join('_' if c.isalnum() else c for c in matched_word)
+                        redacted_text = redacted_text[:match.start()] + redacted_word + redacted_text[match.end():]
+                else:
+                    # Exact word pattern
+                    regex = re.compile(r'\b' + re.escape(pattern) + r'\b', re.IGNORECASE)
+                    
+                    # Find all matches and replace
+                    def replace_word(match):
+                        word = match.group(0)
+                        # Replace each letter with underscore, preserve case structure
+                        return ''.join('_' if c.isalnum() else c for c in word)
+                    
+                    redacted_text = regex.sub(replace_word, redacted_text)
+            
+            # Create new entry with redacted text
+            redacted_entry = SubtitleEntry(
+                index=entry.index,
+                start_time=entry.start_time,
+                end_time=entry.end_time,
+                text=redacted_text
+            )
+            redacted_entries.append(redacted_entry)
+        
+        # Create new SubtitleFile
+        return SubtitleFile(
+            path=subtitle_file.path,
+            entries=redacted_entries,
+            encoding=subtitle_file.encoding
+        )
     
     def can_process(self, video_path: Path) -> tuple[bool, Optional[str]]:
         """
