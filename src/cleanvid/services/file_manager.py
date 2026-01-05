@@ -47,10 +47,12 @@ class FileManager:
         try:
             with open(self.processed_log_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Extract file paths from log entries
+                # Extract file paths from SUCCESSFUL log entries only
                 self._processed_files = {
                     entry['video_path'] for entry in data
-                    if isinstance(entry, dict) and 'video_path' in entry
+                    if isinstance(entry, dict) 
+                    and 'video_path' in entry
+                    and entry.get('success', False)  # Only successful videos
                 }
         except Exception as e:
             print(f"Warning: Failed to load processed log: {e}")
@@ -234,8 +236,9 @@ class FileManager:
             segments_muted: Number of segments that were muted.
             error: Error message if processing failed.
         """
-        # Add to processed set
-        self._processed_files.add(str(video_path))
+        # Only add to processed set if successful
+        if success:
+            self._processed_files.add(str(video_path))
         
         # Load existing log
         log_entries = []
