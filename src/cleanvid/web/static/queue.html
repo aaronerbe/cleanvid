@@ -43,9 +43,20 @@
         <section class="mb-8">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold">Pending Queue (<span id="pendingCount">0</span> videos)</h2>
-                <button onclick="clearQueue()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                    Clear All Pending
-                </button>
+                <div class="flex gap-2">
+                    <button id="stopQueueBtn" onclick="stopQueue()" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">
+                        ⏸️ Stop Processing
+                    </button>
+                    <button id="resumeQueueBtn" onclick="resumeQueue()" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 hidden">
+                        ▶️ Resume Processing
+                    </button>
+                    <button onclick="forceReset()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">
+                        🔄 Force Reset
+                    </button>
+                    <button onclick="clearQueue()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                        🗑️ Clear All Pending
+                    </button>
+                </div>
             </div>
             <div id="pendingQueueSection" class="bg-white rounded-lg shadow-md divide-y">
                 <!-- Will be populated by JavaScript -->
@@ -57,6 +68,8 @@
         // Auto-refresh every 2 seconds
         setInterval(refreshQueue, 2000);
         refreshQueue(); // Initial load
+        updateQueueWorkerStatus(); // Check worker status
+        setInterval(updateQueueWorkerStatus, 3000); // Check every 3 seconds
 
         async function refreshQueue() {
             try {
@@ -204,10 +217,85 @@
                     await fetch(`/api/queue/${i}`, { method: 'DELETE' });
                 }
 
-                alert('Queue cleared!');
+                alert('✅ Queue cleared!');
                 refreshQueue();
             } catch (error) {
-                alert('Error clearing queue: ' + error.message);
+                alert('❌ Error clearing queue: ' + error.message);
+            }
+        }
+
+        async function stopQueue() {
+            if (!confirm('⏸️ Stop queue processing?\n\nCurrent video will finish, then processing will pause.')) return;
+
+            try {
+                const response = await fetch('/api/queue/stop', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    updateQueueWorkerStatus();
+                } else {
+                    alert('ℹ️ ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ Error stopping queue: ' + error.message);
+            }
+        }
+
+        async function resumeQueue() {
+            if (!confirm('▶️ Resume queue processing?')) return;
+
+            try {
+                const response = await fetch('/api/queue/resume', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    updateQueueWorkerStatus();
+                } else {
+                    alert('ℹ️ ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ Error resuming queue: ' + error.message);
+            }
+        }
+
+        async function updateQueueWorkerStatus() {
+            try {
+                const response = await fetch('/api/queue/status');
+                const data = await response.json();
+
+                const stopBtn = document.getElementById('stopQueueBtn');
+                const resumeBtn = document.getElementById('resumeQueueBtn');
+
+                if (data.worker_running) {
+                    stopBtn.classList.remove('hidden');
+                    resumeBtn.classList.add('hidden');
+                } else {
+                    stopBtn.classList.add('hidden');
+                    resumeBtn.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error checking worker status:', error);
+            }
+        }
+
+        async function forceReset() {
+            if (!confirm('🔄 Force Reset Queue?\n\nThis will:\n1. Stop the worker\n2. Clear any stuck job\n3. Restart the worker\n\nUse this if the queue appears hung.')) return;
+
+            try {
+                const response = await fetch('/api/queue/force-reset', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    refreshQueue();
+                    updateQueueWorkerStatus();
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Force reset failed'));
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
             }
         }
     </script>

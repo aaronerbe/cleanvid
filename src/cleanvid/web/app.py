@@ -513,6 +513,112 @@ def api_delete_queue_job(job_index):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/queue/stop', methods=['POST'])
+def api_stop_queue():
+    """Stop the queue worker (pause processing)."""
+    global worker_running
+    
+    try:
+        if not worker_running:
+            return jsonify({
+                'success': False,
+                'message': 'Queue is already stopped'
+            })
+        
+        worker_running = False
+        
+        return jsonify({
+            'success': True,
+            'message': 'Queue processing stopped. Current job will finish, then processing will pause.'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/queue/resume', methods=['POST'])
+def api_resume_queue():
+    """Resume the queue worker (start processing)."""
+    global worker_running, worker_thread
+    
+    try:
+        if worker_running:
+            return jsonify({
+                'success': False,
+                'message': 'Queue is already running'
+            })
+        
+        # Check for stuck jobs before resuming
+        proc = get_processor()
+        if hasattr(proc, 'processing_queue') and proc.processing_queue:
+            queue_status = proc.processing_queue.get_status()
+            
+            # If there's a current job, it might be stuck - clear it
+            if queue_status.get('current_job'):
+                print("⚠️  Warning: Found stuck job on resume, clearing it")
+                proc.processing_queue.current_job = None
+                proc.processing_queue._save()
+        
+        # Restart the worker
+        start_queue_worker()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Queue processing resumed (cleared any stuck jobs)'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/queue/status')
+def api_queue_worker_status():
+    """Get queue worker status (running/stopped)."""
+    global worker_running
+    
+    return jsonify({
+        'worker_running': worker_running,
+        'status': 'running' if worker_running else 'stopped'
+    })
+
+
+@app.route('/api/queue/force-reset', methods=['POST'])
+def api_force_reset_queue():
+    """Force reset queue - clears stuck job and restarts worker."""
+    global worker_running
+    
+    try:
+        # Stop worker if running
+        was_running = worker_running
+        worker_running = False
+        
+        # Wait a moment for worker to stop
+        import time
+        time.sleep(1)
+        
+        # Clear any stuck current job
+        proc = get_processor()
+        if hasattr(proc, 'processing_queue') and proc.processing_queue:
+            if proc.processing_queue.current_job:
+                print("⚠️  Force reset: Clearing stuck job")
+                proc.processing_queue.current_job = None
+                proc.processing_queue._save()
+        
+        # Restart worker if it was running
+        if was_running:
+            start_queue_worker()
+            return jsonify({
+                'success': True,
+                'message': 'Queue force reset complete - worker restarted'
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'message': 'Queue force reset complete - worker remains stopped'
+            })
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/processing/status')
 def api_get_processing_status():
     """Get current processing queue status."""
