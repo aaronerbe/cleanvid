@@ -167,6 +167,12 @@ def queue_page():
     return send_from_directory('static', 'queue.html')
 
 
+@app.route('/failed.html')
+def failed_page():
+    """Serve the failed videos HTML."""
+    return send_from_directory('static', 'failed.html')
+
+
 @app.route('/api/status')
 def api_status():
     """Get current system status."""

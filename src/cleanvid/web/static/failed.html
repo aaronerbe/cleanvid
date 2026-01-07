@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Failed Videos - Cleanvid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <header class="bg-red-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">Failed Videos</h1>
+                    <p class="text-red-100">Review and retry processing failures</p>
+                </div>
+                <a href="/" class="px-4 py-2 bg-red-700 hover:bg-red-800 rounded">← Back to Dashboard</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Controls -->
+        <section class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- Filter by Error Type -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Error Type</label>
+                    <select id="errorFilter" onchange="filterResults()" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <option value="">All Error Types</option>
+                        <!-- Populated by JavaScript -->
+                    </select>
+                </div>
+
+                <!-- Sort By -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                    <select id="sortBy" onchange="filterResults()" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <option value="timestamp_desc">Newest First</option>
+                        <option value="timestamp_asc">Oldest First</option>
+                        <option value="name_asc">Name A-Z</option>
+                        <option value="name_desc">Name Z-A</option>
+                    </select>
+                </div>
+
+                <!-- Items per page -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Per Page</label>
+                    <select id="perPage" onchange="filterResults()" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-end">
+                    <button onclick="resetAllFailed()" class="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+                        🔄 Reset All Failed
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-2xl font-bold text-gray-900" id="totalCount">0</div>
+                        <div class="text-sm text-gray-600">Total Failed</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-red-600" id="filteredCount">0</div>
+                        <div class="text-sm text-gray-600">Filtered Results</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-blue-600" id="errorTypeCount">0</div>
+                        <div class="text-sm text-gray-600">Error Types</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Failed Videos List -->
+        <section class="bg-white rounded-lg shadow-md">
+            <div id="failedVideosList" class="divide-y">
+                <!-- Populated by JavaScript -->
+            </div>
+
+            <!-- Pagination -->
+            <div id="pagination" class="p-4 border-t border-gray-200 flex justify-between items-center">
+                <!-- Populated by JavaScript -->
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let allFailures = [];
+        let filteredFailures = [];
+        let currentPage = 1;
+
+        // Load failed videos on page load
+        loadFailedVideos();
+
+        async function loadFailedVideos() {
+            try {
+                const response = await fetch('/api/failures');
+                const data = await response.json();
+
+                allFailures = data.failures || [];
+                
+                // Update stats
+                document.getElementById('totalCount').textContent = allFailures.length;
+                document.getElementById('errorTypeCount').textContent = Object.keys(data.error_groups || {}).length;
+
+                // Populate error type filter
+                populateErrorFilter(data.error_groups || {});
+
+                // Initial filter
+                filterResults();
+
+            } catch (error) {
+                console.error('Error loading failed videos:', error);
+                document.getElementById('failedVideosList').innerHTML = 
+                    '<div class="p-8 text-center text-red-600">Error loading failed videos</div>';
+            }
+        }
+
+        function populateErrorFilter(errorGroups) {
+            const select = document.getElementById('errorFilter');
+            
+            // Clear existing options except "All"
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+
+            // Add error types with counts
+            for (const [errorType, videos] of Object.entries(errorGroups)) {
+                const option = document.createElement('option');
+                option.value = errorType;
+                option.textContent = `${errorType} (${videos.length})`;
+                select.appendChild(option);
+            }
+        }
+
+        function classifyError(errorMsg) {
+            const error = (errorMsg || 'Unknown error').toLowerCase();
+            
+            if (error.includes('ffprobe') || error.includes('ffmpeg')) {
+                return 'FFmpeg/FFprobe Error';
+            } else if (error.includes('subtitle') && error.includes('not found')) {
+                return 'Missing Subtitle';
+            } else if (error.includes('subtitle') && error.includes('empty')) {
+                return 'Empty Subtitle';
+            } else if (error.includes('parse') && error.includes('srt')) {
+                return 'Failed to Parse SRT';
+            } else if (error.includes('encoding') || error.includes('utf-8') || error.includes('decode')) {
+                return 'Encoding Error';
+            } else if (error.includes('directory') || error.includes('@eadir')) {
+                return 'Invalid Path';
+            } else if (error.includes('not found')) {
+                return 'File Not Found';
+            } else if (error.includes('download')) {
+                return 'Download Failed';
+            } else {
+                return 'Other Error';
+            }
+        }
+
+        function filterResults() {
+            const errorFilter = document.getElementById('errorFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+            
+            // Filter
+            if (errorFilter === '') {
+                filteredFailures = [...allFailures];
+            } else {
+                filteredFailures = allFailures.filter(f => 
+                    classifyError(f.error) === errorFilter
+                );
+            }
+
+            // Sort
+            filteredFailures.sort((a, b) => {
+                switch(sortBy) {
+                    case 'timestamp_desc':
+                        return (b.timestamp || '').localeCompare(a.timestamp || '');
+                    case 'timestamp_asc':
+                        return (a.timestamp || '').localeCompare(b.timestamp || '');
+                    case 'name_asc':
+                        return getVideoName(a.video_path).localeCompare(getVideoName(b.video_path));
+                    case 'name_desc':
+                        return getVideoName(b.video_path).localeCompare(getVideoName(a.video_path));
+                    default:
+                        return 0;
+                }
+            });
+
+            // Update filtered count
+            document.getElementById('filteredCount').textContent = filteredFailures.length;
+
+            // Reset to page 1
+            currentPage = 1;
+
+            // Render
+            renderPage();
+        }
+
+        function renderPage() {
+            const perPage = document.getElementById('perPage').value;
+            const container = document.getElementById('failedVideosList');
+
+            if (filteredFailures.length === 0) {
+                container.innerHTML = '<div class="p-8 text-center text-gray-500">No failed videos found</div>';
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            let paginated;
+            let totalPages;
+
+            if (perPage === 'all') {
+                paginated = filteredFailures;
+                totalPages = 1;
+            } else {
+                const itemsPerPage = parseInt(perPage);
+                totalPages = Math.ceil(filteredFailures.length / itemsPerPage);
+                const start = (currentPage - 1) * itemsPerPage;
+                const end = start + itemsPerPage;
+                paginated = filteredFailures.slice(start, end);
+            }
+
+            // Render videos
+            container.innerHTML = paginated.map((failure, index) => {
+                const videoName = getVideoName(failure.video_path);
+                const errorType = classifyError(failure.error);
+                const timestamp = new Date(failure.timestamp).toLocaleString();
+
+                return `
+                    <div class="p-4 hover:bg-gray-50">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <h3 class="font-semibold text-gray-900">${videoName}</h3>
+                                    <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">${errorType}</span>
+                                </div>
+                                <div class="text-sm text-gray-600 mb-2">
+                                    <span class="font-medium">Error:</span> ${failure.error || 'Unknown error'}
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    Failed: ${timestamp}
+                                </div>
+                                <div class="text-xs text-gray-400 mt-1 font-mono truncate" title="${failure.video_path}">
+                                    ${failure.video_path}
+                                </div>
+                            </div>
+                            <div class="flex gap-2 ml-4">
+                                <button onclick="retryVideo('${escapeQuotes(failure.video_path)}')" 
+                                        class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm whitespace-nowrap">
+                                    🔄 Retry
+                                </button>
+                                <button onclick="resetVideo('${escapeQuotes(failure.video_path)}')" 
+                                        class="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm whitespace-nowrap">
+                                    ↩️ Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Render pagination
+            renderPagination(totalPages);
+        }
+
+        function renderPagination(totalPages) {
+            const pagination = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                pagination.innerHTML = `<div class="text-sm text-gray-600">Showing all ${filteredFailures.length} results</div>`;
+                return;
+            }
+
+            const pages = [];
+            const maxVisible = 7;
+
+            // Always show first page
+            pages.push(1);
+
+            if (totalPages <= maxVisible) {
+                // Show all pages
+                for (let i = 2; i <= totalPages; i++) {
+                    pages.push(i);
+                }
+            } else {
+                // Show ellipsis
+                if (currentPage <= 4) {
+                    for (let i = 2; i <= 5; i++) pages.push(i);
+                    pages.push('...');
+                    pages.push(totalPages);
+                } else if (currentPage >= totalPages - 3) {
+                    pages.push('...');
+                    for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+                } else {
+                    pages.push('...');
+                    pages.push(currentPage - 1);
+                    pages.push(currentPage);
+                    pages.push(currentPage + 1);
+                    pages.push('...');
+                    pages.push(totalPages);
+                }
+            }
+
+            const buttons = pages.map(page => {
+                if (page === '...') {
+                    return '<span class="px-3 py-1 text-gray-400">...</span>';
+                } else if (page === currentPage) {
+                    return `<button class="px-3 py-2 bg-red-600 text-white rounded font-semibold">${page}</button>`;
+                } else {
+                    return `<button onclick="goToPage(${page})" class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">${page}</button>`;
+                }
+            }).join('');
+
+            pagination.innerHTML = `
+                <div class="flex gap-2">
+                    <button onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} 
+                            class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ← Previous
+                    </button>
+                    ${buttons}
+                    <button onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} 
+                            class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Next →
+                    </button>
+                </div>
+                <div class="text-sm text-gray-600">
+                    Page ${currentPage} of ${totalPages}
+                </div>
+            `;
+        }
+
+        function goToPage(page) {
+            const perPage = document.getElementById('perPage').value;
+            if (perPage === 'all') return;
+
+            const totalPages = Math.ceil(filteredFailures.length / parseInt(perPage));
+            
+            if (page < 1 || page > totalPages) return;
+            
+            currentPage = page;
+            renderPage();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function getVideoName(path) {
+            return path.split('/').pop();
+        }
+
+        function escapeQuotes(str) {
+            return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        async function retryVideo(videoPath) {
+            if (!confirm(`Retry processing:\n${getVideoName(videoPath)}?`)) return;
+
+            try {
+                // Reset first
+                await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+
+                // Add to queue
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Video added to processing queue!');
+                    loadFailedVideos(); // Refresh list
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Failed to add to queue'));
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        async function resetVideo(videoPath) {
+            if (!confirm(`Reset status for:\n${getVideoName(videoPath)}?`)) return;
+
+            try {
+                const response = await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Video reset successfully!');
+                    loadFailedVideos(); // Refresh list
+                } else {
+                    alert('ℹ️ ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        async function resetAllFailed() {
+            const count = filteredFailures.length;
+            
+            if (!confirm(`🔄 Reset ALL ${count} failed video(s)?\n\nThis will remove them from the processed log so they can be reprocessed.`)) return;
+
+            try {
+                const response = await fetch('/api/reset-failed', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`✅ Reset ${data.count} failed video(s)!`);
+                    loadFailedVideos(); // Refresh list
+                } else {
+                    alert('❌ Error resetting videos');
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
