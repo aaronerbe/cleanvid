@@ -62,11 +62,15 @@
                     <div class="flex gap-2">
                         <button id="bypassSelectedBtn" onclick="bypassSelected()" disabled
                                 class="flex-1 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
-                            Bypass Selected
+                            Bypass
+                        </button>
+                        <button id="retrySelectedBtn" onclick="retrySelected()" disabled
+                                class="flex-1 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
+                            Retry
                         </button>
                         <button id="resetSelectedBtn" onclick="resetSelected()" disabled
                                 class="flex-1 px-3 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
-                            Reset Selected
+                            Reset
                         </button>
                     </div>
                 </div>
@@ -456,9 +460,11 @@
             
             // Enable/disable bulk action buttons
             const bypassBtn = document.getElementById('bypassSelectedBtn');
+            const retryBtn = document.getElementById('retrySelectedBtn');
             const resetBtn = document.getElementById('resetSelectedBtn');
             
             bypassBtn.disabled = count === 0;
+            retryBtn.disabled = count === 0;
             resetBtn.disabled = count === 0;
             
             // Update select all checkbox state
@@ -579,6 +585,57 @@
                 } else {
                     alert('❌ Error: ' + (data.error || 'Bypass failed'));
                 }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        async function retrySelected() {
+            const count = selectedPaths.size;
+            if (count === 0) {
+                alert('Please select at least one video');
+                return;
+            }
+
+            if (!confirm(`Retry ${count} selected video(s)?\n\nThese will be reset and added to the processing queue.`)) return;
+
+            try {
+                const paths = Array.from(selectedPaths);
+                let resetCount = 0;
+                let queuedCount = 0;
+
+                // Reset all first
+                for (const path of paths) {
+                    try {
+                        const response = await fetch('/api/reset', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ video_path: path })
+                        });
+                        const data = await response.json();
+                        if (data.success) resetCount++;
+                    } catch {
+                        // Continue on error
+                    }
+                }
+
+                // Add all to queue
+                for (const path of paths) {
+                    try {
+                        const response = await fetch('/api/process', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ video_path: path })
+                        });
+                        const data = await response.json();
+                        if (data.success) queuedCount++;
+                    } catch {
+                        // Continue on error
+                    }
+                }
+
+                alert(`✅ Reset ${resetCount} video(s)\n✅ Added ${queuedCount} video(s) to processing queue!`);
+                loadFailedVideos();
             } catch (error) {
                 alert('❌ Error: ' + error.message);
             }
