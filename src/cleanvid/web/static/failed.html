@@ -56,28 +56,48 @@
                     </select>
                 </div>
 
-                <!-- Actions -->
-                <div class="flex items-end">
-                    <button onclick="resetAllFailed()" class="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
-                        🔄 Reset All Failed
-                    </button>
+                <!-- Bulk Actions -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Bulk Actions</label>
+                    <div class="flex gap-2">
+                        <button id="bypassSelectedBtn" onclick="bypassSelected()" disabled
+                                class="flex-1 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
+                            Bypass Selected
+                        </button>
+                        <button id="resetSelectedBtn" onclick="resetSelected()" disabled
+                                class="flex-1 px-3 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
+                            Reset Selected
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Stats -->
+            <!-- Second row: Reset All and Stats -->
             <div class="mt-4 pt-4 border-t border-gray-200">
-                <div class="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                        <div class="text-2xl font-bold text-gray-900" id="totalCount">0</div>
-                        <div class="text-sm text-gray-600">Total Failed</div>
-                    </div>
-                    <div>
-                        <div class="text-2xl font-bold text-red-600" id="filteredCount">0</div>
-                        <div class="text-sm text-gray-600">Filtered Results</div>
-                    </div>
-                    <div>
-                        <div class="text-2xl font-bold text-blue-600" id="errorTypeCount">0</div>
-                        <div class="text-sm text-gray-600">Error Types</div>
+                <div class="flex justify-between items-center">
+                    <!-- Reset All Button -->
+                    <button onclick="resetAllFailed()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                        🔄 Reset All Failed
+                    </button>
+                    
+                    <!-- Stats -->
+                    <div class="flex gap-8 text-center">
+                        <div>
+                            <div class="text-2xl font-bold text-gray-900" id="totalCount">0</div>
+                            <div class="text-sm text-gray-600">Total Failed</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-red-600" id="filteredCount">0</div>
+                            <div class="text-sm text-gray-600">Filtered Results</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-blue-600" id="selectedCount">0</div>
+                            <div class="text-sm text-gray-600">Selected</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-purple-600" id="errorTypeCount">0</div>
+                            <div class="text-sm text-gray-600">Error Types</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -85,6 +105,14 @@
 
         <!-- Failed Videos List -->
         <section class="bg-white rounded-lg shadow-md">
+            <!-- Select All Header -->
+            <div class="p-4 border-b border-gray-200 bg-gray-50">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" class="w-5 h-5 rounded">
+                    <span class="font-medium text-gray-700">Select All (filtered)</span>
+                </label>
+            </div>
+            
             <div id="failedVideosList" class="divide-y">
                 <!-- Populated by JavaScript -->
             </div>
@@ -100,6 +128,25 @@
         let allFailures = [];
         let filteredFailures = [];
         let currentPage = 1;
+        let selectedPaths = new Set();
+
+        // Build a map of video_path -> error_type from the API response
+        let errorTypeMap = {};
+
+        function buildErrorTypeMap(errorGroups) {
+            // Build reverse lookup: video_path -> error_type
+            errorTypeMap = {};
+            for (const [errorType, videos] of Object.entries(errorGroups)) {
+                for (const video of videos) {
+                    errorTypeMap[video.video_path] = errorType;
+                }
+            }
+        }
+
+        function getErrorType(failure) {
+            // Use the pre-computed error type from API
+            return errorTypeMap[failure.video_path] || 'Unknown Error';
+        }
 
         // Load failed videos on page load
         loadFailedVideos();
@@ -122,6 +169,10 @@
                 // Populate error type filter
                 populateErrorFilter(errorGroups);
 
+                // Clear selections
+                selectedPaths.clear();
+                updateSelectionUI();
+
                 // Initial filter
                 filterResults();
 
@@ -140,31 +191,17 @@
                 select.remove(1);
             }
 
+            // Sort error types by count (descending)
+            const sortedTypes = Object.entries(errorGroups)
+                .sort((a, b) => b[1].length - a[1].length);
+
             // Add error types with counts
-            for (const [errorType, videos] of Object.entries(errorGroups)) {
+            for (const [errorType, videos] of sortedTypes) {
                 const option = document.createElement('option');
                 option.value = errorType;
                 option.textContent = `${errorType} (${videos.length})`;
                 select.appendChild(option);
             }
-        }
-
-        // Build a map of video_path -> error_type from the API response
-        let errorTypeMap = {};
-
-        function buildErrorTypeMap(errorGroups) {
-            // Build reverse lookup: video_path -> error_type
-            errorTypeMap = {};
-            for (const [errorType, videos] of Object.entries(errorGroups)) {
-                for (const video of videos) {
-                    errorTypeMap[video.video_path] = errorType;
-                }
-            }
-        }
-
-        function getErrorType(failure) {
-            // Use the pre-computed error type from API
-            return errorTypeMap[failure.video_path] || 'Unknown Error';
         }
 
         function filterResults() {
@@ -202,6 +239,9 @@
             // Reset to page 1
             currentPage = 1;
 
+            // Update select all checkbox
+            updateSelectAllCheckbox();
+
             // Render
             renderPage();
         }
@@ -235,10 +275,22 @@
                 const videoName = getVideoName(failure.video_path);
                 const errorType = getErrorType(failure);
                 const timestamp = new Date(failure.timestamp).toLocaleString();
+                const isChecked = selectedPaths.has(failure.video_path);
+                const escapedPath = escapeQuotes(failure.video_path);
 
                 return `
                     <div class="p-4 hover:bg-gray-50">
-                        <div class="flex items-start justify-between">
+                        <div class="flex items-start gap-4">
+                            <!-- Checkbox -->
+                            <div class="pt-1">
+                                <input type="checkbox" 
+                                       class="video-checkbox w-5 h-5 rounded"
+                                       data-path="${failure.video_path.replace(/"/g, '&quot;')}"
+                                       ${isChecked ? 'checked' : ''}
+                                       onchange="toggleSelection(this)">
+                            </div>
+                            
+                            <!-- Content -->
                             <div class="flex-1">
                                 <div class="flex items-center gap-3 mb-2">
                                     <h3 class="font-semibold text-gray-900">${videoName}</h3>
@@ -254,13 +306,22 @@
                                     ${failure.video_path}
                                 </div>
                             </div>
+                            
+                            <!-- Individual Actions -->
                             <div class="flex gap-2 ml-4">
-                                <button onclick="retryVideo('${escapeQuotes(failure.video_path)}')" 
-                                        class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm whitespace-nowrap">
+                                <button onclick="bypassVideo('${escapedPath}')" 
+                                        class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm whitespace-nowrap"
+                                        title="Copy to output without processing">
+                                    ➡️ Bypass
+                                </button>
+                                <button onclick="retryVideo('${escapedPath}')" 
+                                        class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm whitespace-nowrap"
+                                        title="Reset and add to processing queue">
                                     🔄 Retry
                                 </button>
-                                <button onclick="resetVideo('${escapeQuotes(failure.video_path)}')" 
-                                        class="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm whitespace-nowrap">
+                                <button onclick="resetVideo('${escapedPath}')" 
+                                        class="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm whitespace-nowrap"
+                                        title="Remove from failed list">
                                     ↩️ Reset
                                 </button>
                             </div>
@@ -352,12 +413,89 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        // Selection functions
+        function toggleSelection(checkbox) {
+            const path = checkbox.dataset.path;
+            if (checkbox.checked) {
+                selectedPaths.add(path);
+            } else {
+                selectedPaths.delete(path);
+            }
+            updateSelectionUI();
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAllCheckbox').checked;
+            
+            if (selectAll) {
+                // Select all filtered failures
+                filteredFailures.forEach(f => selectedPaths.add(f.video_path));
+            } else {
+                // Deselect all filtered failures
+                filteredFailures.forEach(f => selectedPaths.delete(f.video_path));
+            }
+            
+            // Update checkboxes on current page
+            document.querySelectorAll('.video-checkbox').forEach(cb => {
+                cb.checked = selectAll;
+            });
+            
+            updateSelectionUI();
+        }
+
+        function updateSelectAllCheckbox() {
+            const selectAllCb = document.getElementById('selectAllCheckbox');
+            const allFilteredSelected = filteredFailures.length > 0 && 
+                filteredFailures.every(f => selectedPaths.has(f.video_path));
+            selectAllCb.checked = allFilteredSelected;
+        }
+
+        function updateSelectionUI() {
+            const count = selectedPaths.size;
+            document.getElementById('selectedCount').textContent = count;
+            
+            // Enable/disable bulk action buttons
+            const bypassBtn = document.getElementById('bypassSelectedBtn');
+            const resetBtn = document.getElementById('resetSelectedBtn');
+            
+            bypassBtn.disabled = count === 0;
+            resetBtn.disabled = count === 0;
+            
+            // Update select all checkbox state
+            updateSelectAllCheckbox();
+        }
+
+        // Helper functions
         function getVideoName(path) {
             return path.split('/').pop();
         }
 
         function escapeQuotes(str) {
             return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        // Individual action functions
+        async function bypassVideo(videoPath) {
+            if (!confirm(`Bypass ${getVideoName(videoPath)}?\n\nThis will copy directly to output without processing.`)) return;
+
+            try {
+                const response = await fetch('/api/bypass', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Video bypassed successfully!');
+                    loadFailedVideos();
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Bypass failed'));
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
         }
 
         async function retryVideo(videoPath) {
@@ -382,7 +520,7 @@
 
                 if (data.success) {
                     alert('✅ Video added to processing queue!');
-                    loadFailedVideos(); // Refresh list
+                    loadFailedVideos();
                 } else {
                     alert('❌ Error: ' + (data.error || 'Failed to add to queue'));
                 }
@@ -405,7 +543,7 @@
 
                 if (data.success) {
                     alert('✅ Video reset successfully!');
-                    loadFailedVideos(); // Refresh list
+                    loadFailedVideos();
                 } else {
                     alert('ℹ️ ' + data.message);
                 }
@@ -414,8 +552,84 @@
             }
         }
 
+        // Bulk action functions
+        async function bypassSelected() {
+            const count = selectedPaths.size;
+            if (count === 0) {
+                alert('Please select at least one video');
+                return;
+            }
+
+            if (!confirm(`Bypass ${count} selected video(s)?\n\nThese will be added to the bypass queue and copied to output without processing.`)) return;
+
+            try {
+                const paths = Array.from(selectedPaths);
+                
+                const response = await fetch('/api/bypass-multiple', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_paths: paths })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`✅ ${data.queued} video(s) added to bypass queue!`);
+                    loadFailedVideos();
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Bypass failed'));
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        async function resetSelected() {
+            const count = selectedPaths.size;
+            if (count === 0) {
+                alert('Please select at least one video');
+                return;
+            }
+
+            if (!confirm(`Reset ${count} selected video(s)?\n\nThis will remove them from the failed list so they can be reprocessed.`)) return;
+
+            try {
+                const paths = Array.from(selectedPaths);
+                let successCount = 0;
+                let failCount = 0;
+
+                for (const path of paths) {
+                    try {
+                        const response = await fetch('/api/reset', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ video_path: path })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            successCount++;
+                        } else {
+                            failCount++;
+                        }
+                    } catch {
+                        failCount++;
+                    }
+                }
+
+                if (failCount === 0) {
+                    alert(`✅ Reset ${successCount} video(s) successfully!`);
+                } else {
+                    alert(`✅ Reset ${successCount} video(s)\n❌ Failed to reset ${failCount} video(s)`);
+                }
+                
+                loadFailedVideos();
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
         async function resetAllFailed() {
-            const count = filteredFailures.length;
+            const count = allFailures.length;
             
             if (!confirm(`🔄 Reset ALL ${count} failed video(s)?\n\nThis will remove them from the processed log so they can be reprocessed.`)) return;
 
@@ -428,7 +642,7 @@
 
                 if (data.success) {
                     alert(`✅ Reset ${data.count} failed video(s)!`);
-                    loadFailedVideos(); // Refresh list
+                    loadFailedVideos();
                 } else {
                     alert('❌ Error resetting videos');
                 }
