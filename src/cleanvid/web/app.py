@@ -40,7 +40,7 @@ def get_processor():
 
 def background_queue_worker():
     """Background worker that processes pending queue jobs."""
-    global worker_running
+    global worker_running, stop_current_job
     
     print("🔄 Background queue worker started")
     
@@ -54,6 +54,9 @@ def background_queue_worker():
                 
                 # If no current job but pending jobs exist, process next one
                 if not queue_status['current_job'] and queue_status['pending_count'] > 0:
+                    # Reset abort flag before starting new job
+                    stop_current_job = False
+                    
                     # Get next pending job
                     next_job = proc.processing_queue.pending_jobs[0]
                     video_path = Path(next_job.video_path)

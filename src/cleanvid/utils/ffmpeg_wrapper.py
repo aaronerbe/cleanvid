@@ -254,12 +254,14 @@ class FFmpegWrapper:
             
             if process.returncode != 0:
                 stderr_text = stderr.decode('utf-8', errors='replace') if stderr else 'Unknown error'
-                raise RuntimeError(f"FFmpeg failed: {stderr_text}")
+                print(f"  FFmpeg error: {stderr_text[-500:]}")
+                return False
             
             return True
         
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"FFmpeg failed: {e.stderr}")
+        except Exception as e:
+            print(f"  FFmpeg exception: {e}")
+            return False
     
     def check_available(self) -> tuple[bool, str]:
         """
