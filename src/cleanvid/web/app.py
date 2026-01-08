@@ -1066,11 +1066,11 @@ def api_process_scene_queue():
         return jsonify({'error': str(e)}), 500
 
 
-def extract_error_type(error_msg: str) -> str:
+def extract_error_type(error_msg: str, max_words: int = 5) -> str:
     """Extract error type from error message.
     
-    Returns the first part of the error message up to the first colon or dash,
-    or a truncated version if no delimiter found.
+    Takes the first N words to group similar errors together,
+    ignoring file paths and other unique details.
     """
     if not error_msg:
         return 'Unknown Error'
@@ -1078,30 +1078,14 @@ def extract_error_type(error_msg: str) -> str:
     # Normalize whitespace
     error_msg = error_msg.strip()
     
-    # If starts with "Error: ", extract what follows up to next delimiter
-    if error_msg.lower().startswith('error:'):
-        rest = error_msg[6:].strip()
-        # Find the core error type (usually before a path or specific detail)
-        # Look for common delimiters that separate error type from details
-        for delim in [':', ' /', ' \\', ' for ', ' at ', ' in ']:
-            if delim in rest:
-                return 'Error: ' + rest.split(delim)[0].strip()
-        # No delimiter found, return truncated if too long
-        if len(rest) > 50:
-            return 'Error: ' + rest[:50].strip() + '...'
-        return 'Error: ' + rest
+    # Split into words
+    words = error_msg.split()
     
-    # Not starting with "Error:", try to extract meaningful prefix
-    for delim in [':', ' - ', ' /', ' \\']:
-        if delim in error_msg:
-            prefix = error_msg.split(delim)[0].strip()
-            if len(prefix) > 5:  # Reasonable length for an error type
-                return prefix
+    # Take first N words
+    if len(words) <= max_words:
+        return error_msg
     
-    # Return truncated message if too long
-    if len(error_msg) > 60:
-        return error_msg[:60].strip() + '...'
-    return error_msg
+    return ' '.join(words[:max_words]) + '...'
 
 
 def run_server(host='0.0.0.0', port=8080, debug=False):
