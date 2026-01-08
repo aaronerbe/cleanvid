@@ -110,13 +110,17 @@
                 const data = await response.json();
 
                 allFailures = data.failures || [];
+                const errorGroups = data.error_groups || {};
                 
                 // Update stats
                 document.getElementById('totalCount').textContent = allFailures.length;
-                document.getElementById('errorTypeCount').textContent = Object.keys(data.error_groups || {}).length;
+                document.getElementById('errorTypeCount').textContent = Object.keys(errorGroups).length;
+
+                // Build error type lookup map
+                buildErrorTypeMap(errorGroups);
 
                 // Populate error type filter
-                populateErrorFilter(data.error_groups || {});
+                populateErrorFilter(errorGroups);
 
                 // Initial filter
                 filterResults();
@@ -145,28 +149,22 @@
             }
         }
 
-        function classifyError(errorMsg) {
-            const error = (errorMsg || 'Unknown error').toLowerCase();
-            
-            if (error.includes('ffprobe') || error.includes('ffmpeg')) {
-                return 'FFmpeg/FFprobe Error';
-            } else if (error.includes('subtitle') && error.includes('not found')) {
-                return 'Missing Subtitle';
-            } else if (error.includes('subtitle') && error.includes('empty')) {
-                return 'Empty Subtitle';
-            } else if (error.includes('parse') && error.includes('srt')) {
-                return 'Failed to Parse SRT';
-            } else if (error.includes('encoding') || error.includes('utf-8') || error.includes('decode')) {
-                return 'Encoding Error';
-            } else if (error.includes('directory') || error.includes('@eadir')) {
-                return 'Invalid Path';
-            } else if (error.includes('not found')) {
-                return 'File Not Found';
-            } else if (error.includes('download')) {
-                return 'Download Failed';
-            } else {
-                return 'Other Error';
+        // Build a map of video_path -> error_type from the API response
+        let errorTypeMap = {};
+
+        function buildErrorTypeMap(errorGroups) {
+            // Build reverse lookup: video_path -> error_type
+            errorTypeMap = {};
+            for (const [errorType, videos] of Object.entries(errorGroups)) {
+                for (const video of videos) {
+                    errorTypeMap[video.video_path] = errorType;
+                }
             }
+        }
+
+        function getErrorType(failure) {
+            // Use the pre-computed error type from API
+            return errorTypeMap[failure.video_path] || 'Unknown Error';
         }
 
         function filterResults() {
@@ -178,7 +176,7 @@
                 filteredFailures = [...allFailures];
             } else {
                 filteredFailures = allFailures.filter(f => 
-                    classifyError(f.error) === errorFilter
+                    getErrorType(f) === errorFilter
                 );
             }
 
@@ -235,7 +233,7 @@
             // Render videos
             container.innerHTML = paginated.map((failure, index) => {
                 const videoName = getVideoName(failure.video_path);
-                const errorType = classifyError(failure.error);
+                const errorType = getErrorType(failure);
                 const timestamp = new Date(failure.timestamp).toLocaleString();
 
                 return `

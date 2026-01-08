@@ -213,11 +213,11 @@ def api_failures():
         # Get failed videos directly from file manager (gets ALL failed, not just recent 100)
         failures = proc.get_failed_videos()
         
-        # Group by error type
+        # Group by error type (dynamically extracted from actual error messages)
         error_groups = {}
         for failure in failures:
             error = failure.get('error', 'Unknown error')
-            error_type = classify_error(error)
+            error_type = extract_error_type(error)
             if error_type not in error_groups:
                 error_groups[error_type] = []
             error_groups[error_type].append(failure)
@@ -1066,24 +1066,42 @@ def api_process_scene_queue():
         return jsonify({'error': str(e)}), 500
 
 
-def classify_error(error_msg: str) -> str:
-    """Classify error message into category."""
-    error_lower = error_msg.lower()
+def extract_error_type(error_msg: str) -> str:
+    """Extract error type from error message.
     
-    if 'encoding' in error_lower or 'utf-8' in error_lower or 'decode' in error_lower:
-        return 'Encoding Error'
-    elif 'subtitle' in error_lower and 'not found' in error_lower:
-        return 'Missing Subtitle'
-    elif 'subtitle' in error_lower and 'empty' in error_lower:
-        return 'Empty Subtitle'
-    elif 'ffmpeg' in error_lower:
-        return 'FFmpeg Error'
-    elif 'directory' in error_lower or '@eadir' in error_lower:
-        return 'Invalid Path'
-    elif 'not found' in error_lower:
-        return 'File Not Found'
-    else:
-        return 'Other Error'
+    Returns the first part of the error message up to the first colon or dash,
+    or a truncated version if no delimiter found.
+    """
+    if not error_msg:
+        return 'Unknown Error'
+    
+    # Normalize whitespace
+    error_msg = error_msg.strip()
+    
+    # If starts with "Error: ", extract what follows up to next delimiter
+    if error_msg.lower().startswith('error:'):
+        rest = error_msg[6:].strip()
+        # Find the core error type (usually before a path or specific detail)
+        # Look for common delimiters that separate error type from details
+        for delim in [':', ' /', ' \\', ' for ', ' at ', ' in ']:
+            if delim in rest:
+                return 'Error: ' + rest.split(delim)[0].strip()
+        # No delimiter found, return truncated if too long
+        if len(rest) > 50:
+            return 'Error: ' + rest[:50].strip() + '...'
+        return 'Error: ' + rest
+    
+    # Not starting with "Error:", try to extract meaningful prefix
+    for delim in [':', ' - ', ' /', ' \\']:
+        if delim in error_msg:
+            prefix = error_msg.split(delim)[0].strip()
+            if len(prefix) > 5:  # Reasonable length for an error type
+                return prefix
+    
+    # Return truncated message if too long
+    if len(error_msg) > 60:
+        return error_msg[:60].strip() + '...'
+    return error_msg
 
 
 def run_server(host='0.0.0.0', port=8080, debug=False):
