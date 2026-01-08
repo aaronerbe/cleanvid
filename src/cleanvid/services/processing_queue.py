@@ -107,6 +107,10 @@ class ProcessingQueue:
         
         Creates job with appropriate steps based on what processing is needed.
         
+        Processing flow:
+        - Pass 1: Profanity muting + blur/black filters (if any)
+        - Pass 2: Skip zone cuts (only if skip zones exist)
+        
         Args:
             video_path: Full path to video file
             blur: Number of blur filters to apply
@@ -129,27 +133,32 @@ class ProcessingQueue:
         )
         
         # Determine processing steps based on what needs to be done
-        if blur or black:
-            # Pass 1: Video filters (blur/black)
-            filter_types = []
-            if blur:
-                filter_types.append(f"{blur} blur")
-            if black:
-                filter_types.append(f"{black} black")
-            
-            step_name = f"Pass 1: Apply {', '.join(filter_types)} filter(s)"
+        # Pass 1 always includes profanity muting (if any) plus any blur/black filters
+        pass1_parts = []
+        if profanity:
+            pass1_parts.append(f"mute {profanity} profanity")
+        if blur:
+            pass1_parts.append(f"{blur} blur")
+        if black:
+            pass1_parts.append(f"{black} black")
+        
+        # If we have skip zones, we always need a Pass 1 (even if just copying)
+        # because skip cuts happen in Pass 2
+        if skip and not pass1_parts:
+            pass1_parts.append("prepare video")
+        
+        if pass1_parts:
+            step_name = f"Pass 1: {', '.join(pass1_parts)}"
             job.steps.append(JobStep(name=step_name, status="pending"))
         
+        # Pass 2: Cut skip zones (only if skip zones exist)
         if skip:
-            # Pass 2: Cut skip zones (or Pass 1 if no blur/black)
-            pass_num = 2 if (blur or black) else 1
-            step_name = f"Pass {pass_num}: Cut {skip} skip zone(s)"
+            step_name = f"Pass 2: Cut {skip} skip zone(s)"
             job.steps.append(JobStep(name=step_name, status="pending"))
         
-        if not (blur or black or skip):
-            # Profanity-only processing
-            step_name = f"Mute {profanity} profanity segment(s)"
-            job.steps.append(JobStep(name=step_name, status="pending"))
+        # If nothing to do (shouldn't happen but handle gracefully)
+        if not job.steps:
+            job.steps.append(JobStep(name="Copy video (no processing needed)", status="pending"))
         
         self.current_job = job
         self._save()
