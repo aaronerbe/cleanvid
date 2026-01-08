@@ -179,6 +179,13 @@ class FFmpegWrapper:
         if not input_path.exists():
             raise FileNotFoundError(f"Input video not found: {input_path}")
         
+        # Import app module to access stop flag and process tracking
+        try:
+            from cleanvid.web import app as web_app
+            can_check_abort = True
+        except:
+            can_check_abort = False
+        
         # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
@@ -216,13 +223,38 @@ class FFmpegWrapper:
         ])
         
         try:
-            # Run FFmpeg
-            result = subprocess.run(
+            # Run FFmpeg with Popen so we can track and kill it
+            process = subprocess.Popen(
                 cmd,
-                capture_output=True,
-                text=True,
-                check=True
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
             )
+            
+            # Track the process for potential abort
+            if can_check_abort:
+                web_app.current_ffmpeg_process = process
+            
+            # Wait for completion
+            stdout, stderr = process.communicate()
+            
+            # Clear process tracking
+            if can_check_abort:
+                web_app.current_ffmpeg_process = None
+            
+            # Check if we were aborted
+            if can_check_abort and web_app.stop_current_job:
+                print(f"  \u26d4 Processing aborted by user")
+                # Clean up partial output
+                try:
+                    if output_path.exists():
+                        output_path.unlink()
+                except:
+                    pass
+                return False
+            
+            if process.returncode != 0:
+                stderr_text = stderr.decode('utf-8', errors='replace') if stderr else 'Unknown error'
+                raise RuntimeError(f"FFmpeg failed: {stderr_text}")
             
             return True
         

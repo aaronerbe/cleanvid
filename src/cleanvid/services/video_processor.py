@@ -268,7 +268,13 @@ class VideoProcessor:
                 )
             
             # Step 5: Process video with FFmpeg
-            # Two-pass approach: BLUR/BLACK first, then SKIP cuts
+            # Strategy:
+            # - If we have BLUR/BLACK: Pass 1 = blur/black + profanity, Pass 2 = skip cuts
+            # - If we have SKIP only: Pass 1 = profanity muting, Pass 2 = skip cuts
+            # - If no scene filters: Single pass = profanity muting only
+            #
+            # The key insight: profanity muting must happen BEFORE skip cuts,
+            # because mute timestamps are based on original video timing.
             
             # Determine if we need skip processing (separate pass)
             skip_zones = []
@@ -285,12 +291,12 @@ class VideoProcessor:
                 except:
                     pass
             
-            # Pass 1: BLUR/BLACK + profanity muting
+            # Pass 1: BLUR/BLACK + profanity muting (or just profanity if no blur/black)
             if video_filter_complex:
-                # If we have skip zones, use a temp output for pass 1
+                # We have blur/black filters
                 if skip_zones:
                     temp_output = output_path.parent / f"{output_path.stem}_temp{output_path.suffix}"
-                    print(f"  🔄 Two-pass processing: Pass 1 (BLUR/BLACK) -> temp file")
+                    print(f"  🔄 Two-pass processing: Pass 1 (BLUR/BLACK + profanity) -> temp file")
                     pass1_output = temp_output
                 else:
                     pass1_output = output_path
@@ -299,7 +305,7 @@ class VideoProcessor:
                 if self.queue:
                     self.queue.update_step(0, "running")
                 
-                # Process with blur/black filters
+                # Process with blur/black filters + profanity muting
                 success = self._process_with_scene_filters(
                     input_path=video_path,
                     output_path=pass1_output,
@@ -335,12 +341,12 @@ class VideoProcessor:
                     if self.queue:
                         self.queue.update_step(1, "running")
                     
-                    # Apply skip cuts to temp file
+                    # Apply skip cuts to temp file (no audio filter - already muted)
                     success = self._process_with_scene_filters(
                         input_path=pass1_output,
                         output_path=output_path,
                         video_filter_complex=skip_filter,
-                        audio_filter_chain="",  # No audio filter needed
+                        audio_filter_chain="",
                         padded_segments=[],
                         is_skip_mode=True
                     )
@@ -362,41 +368,82 @@ class VideoProcessor:
                     scene_zones_applied += len(skip_zones)
                     print(f"  ✅ Cut out {len(skip_zones)} scene(s) - output is shorter")
             
-            # No blur/black, but we have skip zones
+            # No blur/black, but we have skip zones - need two passes for correct timing
             elif skip_zones:
-                print(f"  🔄 Single-pass processing: SKIP cuts only")
+                print(f"  🔄 Two-pass processing: Pass 1 (profanity muting) -> temp file")
                 from cleanvid.services.scene_processor import SceneProcessor
                 
                 scene_proc = SceneProcessor()
                 
-                # Get video duration
-                probe_result = self.ffmpeg.probe(video_path)
+                # Pass 1: Profanity muting only
+                temp_output = output_path.parent / f"{output_path.stem}_temp{output_path.suffix}"
+                
+                if self.queue:
+                    self.queue.update_step(0, "running")
+                
+                if padded_segments and audio_filter_chain:
+                    # Mute profanity in original video
+                    success = self.ffmpeg.mute_audio(
+                        input_path=video_path,
+                        output_path=temp_output,
+                        filter_chain=audio_filter_chain,
+                        audio_codec=self.ffmpeg_config.audio_codec,
+                        audio_bitrate=self.ffmpeg_config.audio_bitrate,
+                        threads=self.ffmpeg_config.threads,
+                        re_encode_video=self.ffmpeg_config.re_encode_video,
+                        video_codec=self.ffmpeg_config.video_codec,
+                        video_crf=self.ffmpeg_config.video_crf
+                    )
+                    print(f"  ✅ Pass 1: Muted {len(padded_segments)} profanity segment(s)")
+                else:
+                    # No profanity - just copy to temp
+                    import shutil
+                    shutil.copy2(video_path, temp_output)
+                    success = True
+                    print(f"  ✅ Pass 1: No profanity detected, copied to temp")
+                
+                if not success:
+                    result.mark_complete(success=False, error="Pass 1 (profanity muting) failed")
+                    return result
+                
+                if self.queue:
+                    self.queue.update_step(0, "complete")
+                
+                # Pass 2: Skip cuts
+                print(f"  🔄 Two-pass processing: Pass 2 (SKIP cuts)")
+                
+                # Get duration of pass 1 output
+                probe_result = self.ffmpeg.probe(temp_output)
                 duration = probe_result.duration
                 
                 # Generate skip filter
                 skip_filter = scene_proc.generate_skip_filter(skip_zones, duration)
                 
-                # Update queue: starting SKIP processing
                 if self.queue:
-                    self.queue.update_step(0, "running")
+                    self.queue.update_step(1, "running")
                 
-                # Apply skip cuts
+                # Apply skip cuts (no audio filter needed - already muted in pass 1)
                 success = self._process_with_scene_filters(
-                    input_path=video_path,
+                    input_path=temp_output,
                     output_path=output_path,
                     video_filter_complex=skip_filter,
-                    audio_filter_chain=audio_filter_chain if padded_segments else "",
-                    padded_segments=padded_segments,
+                    audio_filter_chain="",
+                    padded_segments=[],
                     is_skip_mode=True
                 )
                 
+                # Clean up temp file
+                try:
+                    temp_output.unlink()
+                except:
+                    pass
+                
                 if not success:
-                    result.mark_complete(success=False, error="SKIP processing failed")
+                    result.mark_complete(success=False, error="Pass 2 (SKIP) failed")
                     return result
                 
-                # Update queue: SKIP complete
                 if self.queue:
-                    self.queue.update_step(0, "complete" if success else "failed")
+                    self.queue.update_step(1, "complete")
                 
                 scene_zones_applied += len(skip_zones)
                 print(f"  ✅ Cut out {len(skip_zones)} scene(s) - output is shorter")
@@ -481,6 +528,13 @@ class VideoProcessor:
         """
         import subprocess
         
+        # Import app module to access stop flag and process tracking
+        try:
+            from cleanvid.web import app as web_app
+            can_check_abort = True
+        except:
+            can_check_abort = False
+        
         try:
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -496,9 +550,10 @@ class VideoProcessor:
             # Handle SKIP mode vs BLUR/BLACK mode differently
             if is_skip_mode:
                 # SKIP mode: filter already has [outv][outa] from trim+concat
+                # Audio muting was already done in Pass 1, so just map outputs
                 cmd.extend(['-filter_complex', video_filter_complex])
                 cmd.extend(['-map', '[outv]', '-map', '[outa]'])
-                print(f"  🔍 DEBUG: Skip mode - using [outv][outa] outputs")
+                print(f"  🔍 DEBUG: Skip mode - cutting scenes")
             else:
                 # BLUR/BLACK mode: wrap filter with [0:v]...[v]
                 filter_with_labels = f"[0:v]{video_filter_complex}[v]"
@@ -530,15 +585,38 @@ class VideoProcessor:
             print(f"  {' '.join(cmd)}")
             print(f"")
             
-            # Run FFmpeg
-            result = subprocess.run(
+            # Run FFmpeg with Popen so we can track and kill it
+            process = subprocess.Popen(
                 cmd,
-                capture_output=True,
-                text=True
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
             )
             
-            if result.returncode != 0:
-                print(f"  FFmpeg error: {result.stderr[-500:] if result.stderr else 'Unknown error'}")
+            # Track the process for potential abort
+            if can_check_abort:
+                web_app.current_ffmpeg_process = process
+            
+            # Wait for completion
+            stdout, stderr = process.communicate()
+            
+            # Clear process tracking
+            if can_check_abort:
+                web_app.current_ffmpeg_process = None
+            
+            # Check if we were aborted
+            if can_check_abort and web_app.stop_current_job:
+                print(f"  ⛔ Processing aborted by user")
+                # Clean up partial output
+                try:
+                    if output_path.exists():
+                        output_path.unlink()
+                except:
+                    pass
+                return False
+            
+            if process.returncode != 0:
+                stderr_text = stderr.decode('utf-8', errors='replace') if stderr else 'Unknown error'
+                print(f"  FFmpeg error: {stderr_text[-500:]}")
                 return False
             
             print(f"  ✓ Video processed with scene filters")

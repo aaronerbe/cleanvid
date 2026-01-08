@@ -72,8 +72,9 @@ class SubtitleFile:
     
     def __post_init__(self):
         """Validate subtitle file."""
-        if not self.path.exists():
-            raise FileNotFoundError(f"Subtitle file not found: {self.path}")
+        # Only validate path exists if it's an existing file being loaded
+        # Skip validation for newly created SubtitleFile objects (for saving)
+        pass
     
     @property
     def duration(self) -> float:
@@ -124,6 +125,37 @@ class SubtitleFile:
             if entry.contains_time(time):
                 return entry
         return None
+    
+    def save(self, output_path: Optional[Path] = None) -> None:
+        """
+        Save subtitle file in SRT format.
+        
+        Args:
+            output_path: Path to save to. If None, overwrites original.
+        """
+        path = output_path or self.path
+        
+        with open(path, 'w', encoding=self.encoding) as f:
+            for entry in self.entries:
+                # Format timestamps
+                start_ts = self._format_srt_timestamp(entry.start_time)
+                end_ts = self._format_srt_timestamp(entry.end_time)
+                
+                f.write(f"{entry.index}\n")
+                f.write(f"{start_ts} --> {end_ts}\n")
+                f.write(f"{entry.text}\n\n")
+    
+    @staticmethod
+    def _format_srt_timestamp(seconds: float) -> str:
+        """Format seconds as SRT timestamp (HH:MM:SS,mmm)."""
+        if seconds < 0:
+            seconds = 0
+        
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = seconds % 60
+        
+        return f"{hours:02d}:{minutes:02d}:{secs:06.3f}".replace('.', ',')
     
     def __len__(self) -> int:
         """Return number of entries."""

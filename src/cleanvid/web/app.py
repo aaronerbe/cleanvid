@@ -26,6 +26,8 @@ processor = None
 # Background worker control
 worker_thread = None
 worker_running = False
+stop_current_job = False  # Signal to abort current processing
+current_ffmpeg_process = None  # Track current FFmpeg subprocess for killing
 
 
 def get_processor():
@@ -521,7 +523,7 @@ def api_delete_queue_job(job_index):
 
 @app.route('/api/queue/stop', methods=['POST'])
 def api_stop_queue():
-    """Stop the queue worker (pause processing)."""
+    """Stop the queue worker (pause processing after current job)."""
     global worker_running
     
     try:
@@ -535,7 +537,58 @@ def api_stop_queue():
         
         return jsonify({
             'success': True,
-            'message': 'Queue processing stopped. Current job will finish, then processing will pause.'
+            'message': 'Queue paused. Current job will finish, then processing will stop.'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/queue/abort', methods=['POST'])
+def api_abort_current():
+    """Abort the current job immediately and stop the queue."""
+    global worker_running, stop_current_job, current_ffmpeg_process
+    
+    try:
+        # Set flags to stop
+        worker_running = False
+        stop_current_job = True
+        
+        # Kill FFmpeg process if running
+        if current_ffmpeg_process is not None:
+            try:
+                current_ffmpeg_process.terminate()
+                print("⛔ Terminated FFmpeg process")
+            except:
+                pass
+        
+        # Clear current job from queue
+        proc = get_processor()
+        if hasattr(proc, 'processing_queue') and proc.processing_queue:
+            current_job = proc.processing_queue.current_job
+            if current_job:
+                video_name = current_job.video_name
+                proc.processing_queue.current_job = None
+                proc.processing_queue._save()
+                
+                # Clean up any temp files
+                try:
+                    import glob
+                    output_dir = proc.file_manager.path_config.output_dir
+                    temp_files = glob.glob(str(output_dir / '**/*_temp.*'), recursive=True)
+                    for temp_file in temp_files:
+                        Path(temp_file).unlink()
+                        print(f"🗑️  Cleaned up temp file: {temp_file}")
+                except:
+                    pass
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'Aborted processing of {video_name}. Queue stopped.'
+                })
+        
+        return jsonify({
+            'success': True,
+            'message': 'Queue stopped (no active job to abort)'
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -544,7 +597,7 @@ def api_stop_queue():
 @app.route('/api/queue/resume', methods=['POST'])
 def api_resume_queue():
     """Resume the queue worker (start processing)."""
-    global worker_running, worker_thread
+    global worker_running, worker_thread, stop_current_job
     
     try:
         if worker_running:
@@ -552,6 +605,9 @@ def api_resume_queue():
                 'success': False,
                 'message': 'Queue is already running'
             })
+        
+        # Reset stop flag
+        stop_current_job = False
         
         # Check for stuck jobs before resuming
         proc = get_processor()

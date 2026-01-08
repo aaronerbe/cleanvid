@@ -328,32 +328,38 @@ class FileManager:
     def reset_processed_status(self, video_path: Path) -> bool:
         """
         Reset processed status for a specific video.
+        Removes the video from both the processed set and the log file.
         
         Args:
             video_path: Path to video file.
         
         Returns:
-            True if video was in processed list, False otherwise.
+            True if video was found and removed, False otherwise.
         """
         video_str = str(video_path)
+        was_in_set = False
+        was_in_log = False
         
-        if video_str not in self._processed_files:
-            return False
+        # Remove from processed set if present
+        if video_str in self._processed_files:
+            self._processed_files.remove(video_str)
+            was_in_set = True
         
-        # Remove from set
-        self._processed_files.remove(video_str)
-        
-        # Remove from log file
+        # Remove from log file (both successful AND failed entries)
         if self.processed_log_path.exists():
             try:
                 with open(self.processed_log_path, 'r', encoding='utf-8') as f:
                     entries = json.load(f)
                 
-                # Filter out this video
+                original_count = len(entries)
+                
+                # Filter out this video (removes both success and failed entries)
                 entries = [
                     e for e in entries
                     if e.get('video_path') != video_str
                 ]
+                
+                was_in_log = len(entries) < original_count
                 
                 # Save updated log
                 with open(self.processed_log_path, 'w', encoding='utf-8') as f:
@@ -361,7 +367,7 @@ class FileManager:
             except Exception as e:
                 print(f"Warning: Failed to update processed log: {e}")
         
-        return True
+        return was_in_set or was_in_log
     
     def reset_failed_videos(self) -> int:
         """

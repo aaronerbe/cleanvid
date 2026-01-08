@@ -44,17 +44,20 @@
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold">Pending Queue (<span id="pendingCount">0</span> videos)</h2>
                 <div class="flex gap-2">
-                    <button id="stopQueueBtn" onclick="stopQueue()" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">
-                        ⏸️ Stop Processing
+                    <button id="abortBtn" onclick="abortCurrent()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                        ⛔ Stop Now
+                    </button>
+                    <button id="pauseQueueBtn" onclick="pauseQueue()" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">
+                        ⏸️ Pause Queue
                     </button>
                     <button id="resumeQueueBtn" onclick="resumeQueue()" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 hidden">
-                        ▶️ Resume Processing
+                        ▶️ Resume Queue
                     </button>
                     <button onclick="forceReset()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">
                         🔄 Force Reset
                     </button>
-                    <button onclick="clearQueue()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                        🗑️ Clear All Pending
+                    <button onclick="clearQueue()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                        🗑️ Clear Pending
                     </button>
                 </div>
             </div>
@@ -224,8 +227,27 @@
             }
         }
 
-        async function stopQueue() {
-            if (!confirm('⏸️ Stop queue processing?\n\nCurrent video will finish, then processing will pause.')) return;
+        async function abortCurrent() {
+            if (!confirm('⛔ Stop processing NOW?\n\nThis will:\n1. Kill the current FFmpeg process\n2. Remove incomplete output\n3. Stop the queue\n\nThe video will NOT be marked as processed.')) return;
+
+            try {
+                const response = await fetch('/api/queue/abort', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    updateQueueWorkerStatus();
+                    refreshQueue();
+                } else {
+                    alert('❌ ' + (data.error || 'Abort failed'));
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        async function pauseQueue() {
+            if (!confirm('⏸️ Pause queue processing?\n\nCurrent video will finish, then processing will pause.')) return;
 
             try {
                 const response = await fetch('/api/queue/stop', { method: 'POST' });
@@ -238,7 +260,7 @@
                     alert('ℹ️ ' + data.message);
                 }
             } catch (error) {
-                alert('❌ Error stopping queue: ' + error.message);
+                alert('❌ Error pausing queue: ' + error.message);
             }
         }
 
@@ -265,14 +287,17 @@
                 const response = await fetch('/api/queue/status');
                 const data = await response.json();
 
-                const stopBtn = document.getElementById('stopQueueBtn');
+                const abortBtn = document.getElementById('abortBtn');
+                const pauseBtn = document.getElementById('pauseQueueBtn');
                 const resumeBtn = document.getElementById('resumeQueueBtn');
 
                 if (data.worker_running) {
-                    stopBtn.classList.remove('hidden');
+                    abortBtn.classList.remove('hidden');
+                    pauseBtn.classList.remove('hidden');
                     resumeBtn.classList.add('hidden');
                 } else {
-                    stopBtn.classList.add('hidden');
+                    abortBtn.classList.add('hidden');
+                    pauseBtn.classList.add('hidden');
                     resumeBtn.classList.remove('hidden');
                 }
             } catch (error) {
