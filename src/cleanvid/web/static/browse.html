@@ -38,7 +38,7 @@
             </div>
         </div>
 
-        <!-- Action Bar -->
+                <!-- Action Bar -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-6">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
@@ -49,9 +49,9 @@
                             class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold">
                         ▶️ Process Selected
                     </button>
-                    <button onclick="processFolder()" id="processFolderBtn" disabled
-                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold">
-                        📁 Process Current Folder
+                    <button onclick="processFolder()" id="processFolderBtn"
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                        📁 Process This Folder
                     </button>
                 </div>
             </div>
@@ -74,7 +74,7 @@
             <ul class="text-sm text-blue-700 space-y-1">
                 <li>• Click a <strong>folder</strong> to navigate into it</li>
                 <li>• Click a <strong>video</strong> to select it for processing</li>
-                <li>• Use <strong>"Process Current Folder"</strong> to queue all videos in the current directory</li>
+                <li>• Use <strong>"Process This Folder"</strong> to queue all videos in the folder <em>and subfolders</em></li>
                 <li>• Videos are processed for profanity filtering only (use Scene Editor for visual filters)</li>
             </ul>
         </div>
@@ -108,11 +108,11 @@
                 // Render file list
                 renderFileList(data.items);
 
-                // Track videos in current folder for "Process Folder" feature
+                // Track videos in current folder for display only
                 currentFolderVideos = data.items.filter(item => item.type === 'file').map(item => item.path);
                 
-                // Enable/disable Process Folder button
-                document.getElementById('processFolderBtn').disabled = currentFolderVideos.length === 0;
+                // Store current path for recursive folder processing
+                currentPath = data.current_path;
 
             } catch (error) {
                 console.error('Error loading directory:', error);
@@ -284,31 +284,28 @@
         }
 
         async function processFolder() {
-            if (currentFolderVideos.length === 0) {
-                alert('No videos in current folder');
-                return;
-            }
-
-            if (!confirm(`Queue ${currentFolderVideos.length} video(s) from this folder for processing?`)) {
+            if (!confirm(`Process all videos in this folder (including subfolders)?\n\nFolder: ${currentPath}`)) {
                 return;
             }
 
             try {
-                // Add each video to the queue
-                let queued = 0;
-                for (const videoPath of currentFolderVideos) {
-                    const response = await fetch('/api/process', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ video_path: videoPath })
-                    });
+                const response = await fetch('/api/process-folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder_path: currentPath })
+                });
 
-                    const data = await response.json();
-                    if (data.success) queued++;
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.queued === 0) {
+                        alert('No video files found in this folder (or subfolders).');
+                    } else {
+                        alert(`✅ ${data.queued} video(s) added to queue!\n\nVisit the Queue page to watch progress.`);
+                    }
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to process folder'));
                 }
-
-                alert(`✅ ${queued} video(s) added to queue!\n\nVisit the Queue page to watch progress.`);
-
             } catch (error) {
                 alert('Error: ' + error.message);
             }

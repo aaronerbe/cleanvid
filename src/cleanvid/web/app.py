@@ -357,6 +357,69 @@ def api_process_all():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/process-folder', methods=['POST'])
+def api_process_folder():
+    """Add all videos in a folder (recursively) to the processing queue."""
+    try:
+        data = request.json
+        folder_path = data.get('folder_path')
+        
+        if not folder_path:
+            return jsonify({'error': 'folder_path required'}), 400
+        
+        proc = get_processor()
+        folder_path = Path(folder_path)
+        
+        # Security: ensure path is within input directory
+        input_dir = proc.file_manager.path_config.input_dir
+        try:
+            folder_path.relative_to(input_dir)
+        except ValueError:
+            return jsonify({'error': 'Access denied - folder outside input directory'}), 403
+        
+        if not folder_path.exists():
+            return jsonify({'error': f'Folder not found: {folder_path}'}), 404
+        
+        if not folder_path.is_dir():
+            return jsonify({'error': f'Path is not a folder: {folder_path}'}), 400
+        
+        # Find all video files recursively
+        video_extensions = proc.file_manager.processing_config.video_extensions
+        videos_found = []
+        
+        for ext in video_extensions:
+            videos_found.extend(folder_path.rglob(f'*{ext}'))
+        
+        # Filter out Synology metadata
+        videos_found = [
+            v for v in videos_found 
+            if not proc.file_manager._is_synology_metadata_path(v)
+        ]
+        
+        if len(videos_found) == 0:
+            return jsonify({
+                'success': True,
+                'queued': 0,
+                'message': 'No video files found in folder'
+            })
+        
+        # Add to queue
+        if hasattr(proc, 'processing_queue') and proc.processing_queue:
+            video_paths = [str(v) for v in videos_found]
+            proc.processing_queue.add_pending_jobs(video_paths)
+            
+            return jsonify({
+                'success': True,
+                'queued': len(video_paths),
+                'message': f'Added {len(video_paths)} video(s) from folder to queue.'
+            })
+        else:
+            return jsonify({'error': 'Processing queue not available'}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/reset', methods=['POST'])
 def api_reset():
     """Reset a video's processing status."""
