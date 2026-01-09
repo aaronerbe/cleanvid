@@ -397,7 +397,6 @@ class VideoProcessor:
                     print(f"  ✅ Pass 1: Muted {len(padded_segments)} profanity segment(s)")
                 else:
                     # No profanity - just copy to temp
-                    import shutil
                     shutil.copy2(video_path, temp_output)
                     success = True
                     print(f"  ✅ Pass 1: No profanity detected, copied to temp")
