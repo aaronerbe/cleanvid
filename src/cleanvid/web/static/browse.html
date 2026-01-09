@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse & Process - Cleanvid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .item-row { transition: background-color 0.15s; }
+        .item-row:hover { background-color: #f3f4f6; }
+        .item-row.selected { background-color: #dbeafe; }
+        .breadcrumb-item:hover { text-decoration: underline; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">Browse & Process</h1>
+                    <p class="text-blue-100">Select videos or folders to process</p>
+                </div>
+                <a href="/" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded">← Back to Dashboard</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Breadcrumb Navigation -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex items-center gap-2 text-sm">
+                <span class="text-gray-500">Path:</span>
+                <div id="breadcrumb" class="flex items-center gap-1 flex-wrap">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <span id="selectionInfo" class="text-gray-600">No selection</span>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="processSelected()" id="processBtn" disabled
+                            class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold">
+                        ▶️ Process Selected
+                    </button>
+                    <button onclick="processFolder()" id="processFolderBtn" disabled
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold">
+                        📁 Process Current Folder
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- File Browser -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="border-b px-4 py-3 bg-gray-50 flex justify-between items-center">
+                <span class="font-semibold text-gray-700">Contents</span>
+                <span id="itemCount" class="text-sm text-gray-500">-- items</span>
+            </div>
+            <div id="fileList" class="divide-y max-h-[60vh] overflow-y-auto">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Help Text -->
+        <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 class="font-semibold text-blue-800 mb-2">💡 Tips</h3>
+            <ul class="text-sm text-blue-700 space-y-1">
+                <li>• Click a <strong>folder</strong> to navigate into it</li>
+                <li>• Click a <strong>video</strong> to select it for processing</li>
+                <li>• Use <strong>"Process Current Folder"</strong> to queue all videos in the current directory</li>
+                <li>• Videos are processed for profanity filtering only (use Scene Editor for visual filters)</li>
+            </ul>
+        </div>
+    </main>
+
+    <script>
+        let currentPath = '';
+        let selectedVideo = null;
+        let currentFolderVideos = [];
+
+        // Initial load
+        loadDirectory('');
+
+        async function loadDirectory(path) {
+            try {
+                currentPath = path;
+                selectedVideo = null;
+                updateSelectionUI();
+
+                const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                // Update breadcrumb
+                updateBreadcrumb(data.current_path);
+
+                // Render file list
+                renderFileList(data.items);
+
+                // Track videos in current folder for "Process Folder" feature
+                currentFolderVideos = data.items.filter(item => item.type === 'file').map(item => item.path);
+                
+                // Enable/disable Process Folder button
+                document.getElementById('processFolderBtn').disabled = currentFolderVideos.length === 0;
+
+            } catch (error) {
+                console.error('Error loading directory:', error);
+                alert('Error loading directory: ' + error.message);
+            }
+        }
+
+        function updateBreadcrumb(fullPath) {
+            const container = document.getElementById('breadcrumb');
+            container.innerHTML = '';
+
+            // Split path and create clickable segments
+            const parts = fullPath.split('/').filter(p => p);
+            let cumulativePath = '';
+
+            // Add root
+            const rootSpan = document.createElement('span');
+            rootSpan.className = 'breadcrumb-item text-blue-600 cursor-pointer';
+            rootSpan.textContent = '🏠 Root';
+            rootSpan.onclick = () => loadDirectory('');
+            container.appendChild(rootSpan);
+
+            parts.forEach((part, index) => {
+                // Add separator
+                const sep = document.createElement('span');
+                sep.className = 'text-gray-400 mx-1';
+                sep.textContent = '/';
+                container.appendChild(sep);
+
+                cumulativePath += '/' + part;
+                const pathForClick = cumulativePath;
+
+                const span = document.createElement('span');
+                span.className = 'breadcrumb-item text-blue-600 cursor-pointer';
+                span.textContent = part;
+                span.onclick = () => loadDirectory(pathForClick);
+                container.appendChild(span);
+            });
+        }
+
+        function renderFileList(items) {
+            const container = document.getElementById('fileList');
+            container.innerHTML = '';
+
+            if (items.length === 0) {
+                container.innerHTML = '<p class="p-6 text-gray-500 text-center">This folder is empty</p>';
+                document.getElementById('itemCount').textContent = '0 items';
+                return;
+            }
+
+            const folders = items.filter(i => i.type === 'directory');
+            const files = items.filter(i => i.type === 'file');
+            
+            document.getElementById('itemCount').textContent = `${folders.length} folders, ${files.length} videos`;
+
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'item-row p-4 cursor-pointer flex items-center gap-4';
+                div.dataset.path = item.path;
+                div.dataset.type = item.type;
+
+                if (item.type === 'directory') {
+                    div.innerHTML = `
+                        <svg class="w-8 h-8 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                        </svg>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-gray-900 truncate">${item.name}</p>
+                            <p class="text-sm text-gray-500">Folder</p>
+                        </div>
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    `;
+                    div.onclick = () => loadDirectory(item.path);
+                } else {
+                    const sizeGB = (item.size / (1024 ** 3)).toFixed(2);
+                    div.innerHTML = `
+                        <svg class="w-8 h-8 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                        </svg>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-gray-900 truncate">${item.name}</p>
+                            <p class="text-sm text-gray-500">${sizeGB} GB</p>
+                        </div>
+                        <div class="select-indicator w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-white hidden" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                    `;
+                    div.onclick = () => selectVideo(item.path, div);
+                }
+
+                container.appendChild(div);
+            });
+        }
+
+        function selectVideo(path, element) {
+            // Deselect previous
+            document.querySelectorAll('.item-row.selected').forEach(el => {
+                el.classList.remove('selected');
+                const indicator = el.querySelector('.select-indicator');
+                if (indicator) {
+                    indicator.classList.remove('bg-green-500', 'border-green-500');
+                    indicator.classList.add('border-gray-300');
+                    indicator.querySelector('svg').classList.add('hidden');
+                }
+            });
+
+            // Select new
+            selectedVideo = path;
+            element.classList.add('selected');
+            const indicator = element.querySelector('.select-indicator');
+            if (indicator) {
+                indicator.classList.add('bg-green-500', 'border-green-500');
+                indicator.classList.remove('border-gray-300');
+                indicator.querySelector('svg').classList.remove('hidden');
+            }
+
+            updateSelectionUI();
+        }
+
+        function updateSelectionUI() {
+            const infoEl = document.getElementById('selectionInfo');
+            const processBtn = document.getElementById('processBtn');
+
+            if (selectedVideo) {
+                const videoName = selectedVideo.split('/').pop();
+                infoEl.textContent = `Selected: ${videoName}`;
+                infoEl.className = 'text-green-600 font-medium';
+                processBtn.disabled = false;
+            } else {
+                infoEl.textContent = 'No video selected';
+                infoEl.className = 'text-gray-600';
+                processBtn.disabled = true;
+            }
+        }
+
+        async function processSelected() {
+            if (!selectedVideo) {
+                alert('Please select a video first');
+                return;
+            }
+
+            const videoName = selectedVideo.split('/').pop();
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: selectedVideo })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`✅ ${videoName} added to queue!\n\nVisit the Queue page to watch progress.`);
+                    selectedVideo = null;
+                    updateSelectionUI();
+                    // Remove selection styling
+                    document.querySelectorAll('.item-row.selected').forEach(el => el.classList.remove('selected'));
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to add to queue'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function processFolder() {
+            if (currentFolderVideos.length === 0) {
+                alert('No videos in current folder');
+                return;
+            }
+
+            if (!confirm(`Queue ${currentFolderVideos.length} video(s) from this folder for processing?`)) {
+                return;
+            }
+
+            try {
+                // Add each video to the queue
+                let queued = 0;
+                for (const videoPath of currentFolderVideos) {
+                    const response = await fetch('/api/process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ video_path: videoPath })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) queued++;
+                }
+
+                alert(`✅ ${queued} video(s) added to queue!\n\nVisit the Queue page to watch progress.`);
+
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

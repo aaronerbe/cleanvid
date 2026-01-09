@@ -1,78 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Cleanvid Dashboard</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <style>
-            .stat-card {
-                transition: transform 0.2s;
-            }
-            .stat-card:hover {
-                transform: translateY(-2px);
-            }
-            .pulse-green {
-                animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-            }
-            @keyframes pulse-green {
-                0%, 100% {
-                    opacity: 1;
-                }
-                50% {
-                    opacity: .5;
-                }
-            }
-            .modal {
-                display: none;
-                position: fixed;
-                z-index: 50;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: 100%;
-                overflow: auto;
-                background-color: rgba(0,0,0,0.4);
-            }
-            .modal.show {
-                display: block;
-            }
-            .modal-content {
-                background-color: #fefefe;
-                margin: 5% auto;
-                padding: 0;
-                border-radius: 8px;
-                width: 90%;
-                max-width: 800px;
-                max-height: 80vh;
-                overflow: hidden;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }
-        </style>
-    </head>
-    <body class="bg-gray-100">
-        <!-- Header -->
-        <header class="bg-blue-600 text-white shadow-lg">
-            <div class="container mx-auto px-4 py-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="text-3xl font-bold">Cleanvid Dashboard</h1>
-                        <p class="text-blue-100">Automated Movie Profanity Filtering</p>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cleanvid Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .stat-card { transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
+        .action-card { transition: all 0.2s; }
+        .action-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        .pulse-green { animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse-green { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .collapsible-content.open { max-height: 500px; }
+        .collapse-header { cursor: pointer; user-select: none; }
+        .collapse-header:hover { background-color: rgba(0,0,0,0.02); }
+        .collapse-icon { transition: transform 0.3s; }
+        .collapse-icon.open { transform: rotate(180deg); }
+        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
+        .modal.show { display: block; }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 0; border-radius: 8px; width: 90%; max-width: 800px; max-height: 80vh; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">Cleanvid Dashboard</h1>
+                    <p class="text-blue-100">Automated Movie Profanity Filtering</p>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm text-blue-100">Last Updated</div>
+                    <div id="lastUpdate" class="text-lg font-semibold">--:--:--</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        
+        <!-- Processing Statistics - Collapsible -->
+        <section class="mb-8">
+            <div class="collapse-header flex items-center justify-between p-2 rounded" onclick="toggleSection('statsSection')">
+                <h2 class="text-2xl font-bold flex items-center gap-2">
+                    Processing Statistics
+                    <svg id="statsIcon" class="collapse-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </h2>
+            </div>
+            <div id="statsSection" class="collapsible-content">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <p class="text-gray-500 text-sm">Total Videos</p>
+                        <p id="totalVideos" class="text-3xl font-bold text-blue-600">--</p>
                     </div>
-                    <div class="text-right">
-                        <div class="text-sm text-blue-100">Last Updated</div>
-                        <div id="lastUpdate" class="text-lg font-semibold">--:--:--</div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <p class="text-gray-500 text-sm">Processed</p>
+                        <p id="processedVideos" class="text-3xl font-bold text-green-600">--</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <p class="text-gray-500 text-sm">Unprocessed</p>
+                        <p id="unprocessedVideos" class="text-3xl font-bold text-yellow-600">--</p>
+                    </div>
+                    <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="window.location.href='/failed.html'">
+                        <p class="text-gray-500 text-sm">Failed</p>
+                        <p id="failedVideos" class="text-3xl font-bold text-red-600">--</p>
+                        <p class="text-xs text-red-500 mt-1">Click to view</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <p class="text-gray-500 text-sm">% Complete</p>
+                        <p id="percentComplete" class="text-3xl font-bold text-purple-600">--%</p>
                     </div>
                 </div>
             </div>
-        </header>
+        </section>
 
-        <!-- Main Content -->
-        <main class="container mx-auto px-4 py-8">
-            <!-- System Status -->
-            <section class="mb-8">
-                <h2 class="text-2xl font-bold mb-4">System Status</h2>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <!-- Actions Section -->
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold mb-4">Actions</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- Browse & Process -->
+                <a href="/browse.html" class="action-card bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-md p-6 cursor-pointer block">
+                    <div class="flex flex-col items-center text-center">
+                        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                        </svg>
+                        <p class="font-bold text-lg">Browse & Process</p>
+                        <p class="text-blue-100 text-sm mt-1">Select videos or folders</p>
+                    </div>
+                </a>
+
+                <!-- Process All -->
+                <div onclick="processAll()" class="action-card bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-md p-6 cursor-pointer">
+                    <div class="flex flex-col items-center text-center">
+                        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        <p class="font-bold text-lg">Process All</p>
+                        <p class="text-green-100 text-sm mt-1">Queue all unprocessed</p>
+                    </div>
+                </div>
+
+                <!-- Scene Editor -->
+                <a href="/scene_editor.html" class="action-card bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-md p-6 cursor-pointer block">
+                    <div class="flex flex-col items-center text-center">
+                        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                        <p class="font-bold text-lg">Scene Editor</p>
+                        <p class="text-purple-100 text-sm mt-1">Blur, black, or skip scenes</p>
+                    </div>
+                </a>
+
+                <!-- View Queue -->
+                <a href="/queue.html" class="action-card bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-md p-6 cursor-pointer block">
+                    <div class="flex flex-col items-center text-center">
+                        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                        </svg>
+                        <p class="font-bold text-lg">View Queue</p>
+                        <p class="text-orange-100 text-sm mt-1"><span id="queueCount">0</span> in queue</p>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <!-- System Status - Collapsible -->
+        <section class="mb-8">
+            <div class="collapse-header flex items-center justify-between p-2 rounded" onclick="toggleSection('systemSection')">
+                <h2 class="text-2xl font-bold flex items-center gap-2">
+                    System Status
+                    <svg id="systemIcon" class="collapse-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </h2>
+            </div>
+            <div id="systemSection" class="collapsible-content">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
                     <!-- Container Status -->
                     <div class="stat-card bg-white rounded-lg shadow-md p-6">
                         <div class="flex items-center justify-between">
@@ -80,7 +149,7 @@
                                 <p class="text-gray-500 text-sm">Container</p>
                                 <p id="containerStatus" class="text-2xl font-bold text-green-600">●</p>
                             </div>
-                            <svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                             </svg>
                         </div>
@@ -93,7 +162,7 @@
                                 <p class="text-gray-500 text-sm">FFmpeg</p>
                                 <p id="ffmpegStatus" class="text-lg font-bold">Available</p>
                             </div>
-                            <svg class="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                         </div>
@@ -106,7 +175,7 @@
                                 <p class="text-gray-500 text-sm">OpenSubtitles</p>
                                 <p id="subtitlesStatus" class="text-lg font-bold">Enabled</p>
                             </div>
-                            <svg class="w-12 h-12 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-10 h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
                             </svg>
                         </div>
@@ -120,11 +189,12 @@
                                 <p id="wordCount" class="text-2xl font-bold">--</p>
                                 <p class="text-xs text-blue-600 mt-1">Click to edit</p>
                             </div>
-                            <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                             </svg>
                         </div>
                     </div>
+
                     <!-- Processing Status -->
                     <div class="stat-card bg-white rounded-lg shadow-md p-6">
                         <div class="flex items-center justify-between">
@@ -132,689 +202,438 @@
                                 <p class="text-gray-500 text-sm">Processing</p>
                                 <p id="processingState" class="text-2xl font-bold text-gray-600">Idle</p>
                             </div>
-                            <svg id="processingIcon" class="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg id="processingIcon" class="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                             </svg>
                         </div>
                     </div>
-                    
-                    <!-- Queue Status - CLICKABLE -->
-                    <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="window.location.href='/queue.html'">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm">Processing Queue</p>
-                                <p id="queueCount" class="text-2xl font-bold text-blue-600">0</p>
-                                <p class="text-xs text-blue-600 mt-1">Click to view</p>
-                            </div>
-                            <svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-                            </svg>
-                        </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Recent Activity & Failures -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Recent Activity -->
+            <section>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">Recent Activity</h2>
+                    <button onclick="refreshHistory()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                        Refresh
+                    </button>
+                </div>
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div id="recentActivity" class="divide-y max-h-96 overflow-y-auto">
+                        <!-- Will be populated by JavaScript -->
                     </div>
                 </div>
             </section>
 
-            <!-- Statistics -->
-            <section class="mb-8">
-                <h2 class="text-2xl font-bold mb-4">Processing Statistics</h2>
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <p class="text-gray-500 text-sm">Total Videos</p>
-                        <p id="totalVideos" class="text-3xl font-bold text-blue-600">--</p>
-                    </div>
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <p class="text-gray-500 text-sm">Processed</p>
-                        <p id="processedVideos" class="text-3xl font-bold text-green-600">--</p>
-                    </div>
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <p class="text-gray-500 text-sm">Unprocessed</p>
-                        <p id="unprocessedVideos" class="text-3xl font-bold text-yellow-600">--</p>
-                    </div>
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <p class="text-gray-500 text-sm">Success Rate</p>
-                        <p id="successRate" class="text-3xl font-bold text-purple-600">--%</p>
-                    </div>
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <p class="text-gray-500 text-sm">Library Size</p>
-                        <p id="totalSize" class="text-3xl font-bold text-indigo-600">-- GB</p>
-                    </div>
-                </div>
-            </section>
-            <!-- Recent Activity & Failures -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <!-- Recent Activity -->
-                <section>
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-2xl font-bold">Recent Activity</h2>
-                        <button onclick="refreshHistory()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+            <!-- Failed Videos -->
+            <section>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">Failed Videos</h2>
+                    <div class="flex gap-2">
+                        <a href="/failed.html" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+                            📋 View All
+                        </a>
+                        <button onclick="refreshFailures()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
                             Refresh
                         </button>
                     </div>
-                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                        <div id="recentActivity" class="divide-y max-h-96 overflow-y-auto">
-                            <!-- Will be populated by JavaScript -->
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Failed Videos - WITH BUTTON TO VIEW ALL -->
-                <section>
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-2xl font-bold">Failed Videos</h2>
-                        <div class="flex gap-2">
-                            <a href="/failed.html" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
-                                📋 View All Failed
-                            </a>
-                            <button onclick="refreshFailures()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                                Refresh
-                            </button>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                        <div id="failedVideos" class="divide-y max-h-96 overflow-y-auto">
-                            <!-- Will be populated by JavaScript -->
-                        </div>
-                    </div>
-                </section>
-            </div>
-
-            <!-- Process Video Section - WITH BROWSE BUTTON AND PROCESS ALL -->
-            <section class="mb-8">
-                <h2 class="text-2xl font-bold mb-4">Process Videos</h2>
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <!-- Add Process All Button -->
-                    <div class="mb-4 flex justify-between items-center">
-                        <p class="text-gray-600">Process individual videos or run full batch processing</p>
-                        <div class="flex gap-3">
-                            <a href="/scene_editor.html" 
-                               class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
-                               title="Edit scene filters (blur, black, skip) for videos with sensitive content">
-                                🎬 Scene Editor
-                            </a>
-                            <button onclick="processAll()" 
-                                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                                    title="Queue all unprocessed videos for profanity filtering. Videos will be processed in the background.">
-                                Process All Unprocessed Videos
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex gap-4">
-                        <input 
-                            type="text" 
-                            id="searchInput" 
-                            placeholder="Search for video by name..." 
-                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            onkeyup="searchVideos()"
-                        />
-                        <button onclick="openBrowseModal()" 
-                                class="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600"
-                                title="Browse and select videos from your library">
-                            Browse
-                        </button>
-                        <button onclick="processSelected()" 
-                                class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-                                title="Queue the selected video for profanity filtering. Processing happens in the background.">
-                            Process
-                        </button>
-                    </div>
-                    <div id="searchResults" class="mt-4 max-h-60 overflow-y-auto">
-                        <!-- Search results will appear here -->
+                </div>
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div id="failedVideosList" class="divide-y max-h-96 overflow-y-auto">
+                        <!-- Will be populated by JavaScript -->
                     </div>
                 </div>
             </section>
+        </div>
 
-        </main>
+    </main>
 
-        <!-- Footer -->
-        <footer class="bg-gray-800 text-white mt-12">
-            <div class="container mx-auto px-4 py-6 text-center">
-                <p>Cleanvid Dashboard v1.0 | <a href="https://github.com" class="text-blue-400 hover:text-blue-300">GitHub</a></p>
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-12">
+        <div class="container mx-auto px-4 py-6 text-center">
+            <p>Cleanvid Dashboard v1.0</p>
+        </div>
+    </footer>
+
+    <!-- Word List Editor Modal -->
+    <div id="wordListModal" class="modal">
+        <div class="modal-content">
+            <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold">Edit Word List</h3>
+                <button onclick="closeWordListModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
             </div>
-        </footer>
-        <!-- File Browser Modal -->
-        <div id="browseModal" class="modal">
-            <div class="modal-content">
-                <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
-                    <h3 class="text-xl font-bold">Browse Videos</h3>
-                    <button onclick="closeBrowseModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
-                </div>
-                <div class="px-6 py-4">
-                    <div id="currentPath" class="text-sm text-gray-600 mb-4"></div>
-                    <div id="browseItems" class="max-h-96 overflow-y-auto">
-                        <!-- Browser items will appear here -->
+            <div class="px-6 py-4">
+                <p class="text-sm text-gray-600 mb-4">One word per line. Use * for wildcards (e.g., "sh*t" matches "shoot", "shut", etc.)</p>
+                <textarea 
+                    id="wordListEditor" 
+                    class="w-full h-96 p-4 border border-gray-300 rounded font-mono text-sm"
+                    placeholder="Loading..."
+                ></textarea>
+                <div class="mt-4 flex justify-between items-center">
+                    <span id="wordListCount" class="text-sm text-gray-600">0 words</span>
+                    <div class="flex gap-2">
+                        <button onclick="closeWordListModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                            Cancel
+                        </button>
+                        <button onclick="saveWordList()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                            Save Changes
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Word List Editor Modal -->
-        <div id="wordListModal" class="modal">
-            <div class="modal-content">
-                <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
-                    <h3 class="text-xl font-bold">Edit Word List</h3>
-                    <button onclick="closeWordListModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
-                </div>
-                <div class="px-6 py-4">
-                    <p class="text-sm text-gray-600 mb-4">One word per line. Use * for wildcards (e.g., "sh*t" matches "shoot", "shut", etc.)</p>
-                    <textarea 
-                        id="wordListEditor" 
-                        class="w-full h-96 p-4 border border-gray-300 rounded font-mono text-sm"
-                        placeholder="Loading..."
-                    ></textarea>
-                    <div class="mt-4 flex justify-between items-center">
-                        <span id="wordListCount" class="text-sm text-gray-600">0 words</span>
-                        <div class="flex gap-2">
-                            <button onclick="closeWordListModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
-                                Cancel
-                            </button>
-                            <button onclick="saveWordList()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                Save Changes
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-
-        <script>
-            let selectedVideoPath = null;
-            let currentBrowsePath = '';
-
-            // Auto-refresh every 10 seconds
-            setInterval(() => {
-                refreshStatus();
-                refreshStatistics();
-                refreshHistory();
-            }, 10000);
-
-            // Initial load
+    <script>
+        // Auto-refresh every 10 seconds
+        setInterval(() => {
             refreshStatus();
-            refreshStatistics();
             refreshHistory();
-            refreshFailures();
-            updateQueueCount();
-            
-            // Update queue count every 2 seconds
-            setInterval(updateQueueCount, 2000);
-            
-            async function updateQueueCount() {
-                try {
-                    const response = await fetch('/api/queue');
-                    const data = await response.json();
-                    
-                    const total = data.pending_count + (data.current_job ? 1 : 0);
-                    document.getElementById('queueCount').textContent = total;
-                } catch (error) {
-                    console.error('Error fetching queue count:', error);
-                }
-            }
-            
-            async function refreshStatus() {
-                try {
-                    const response = await fetch('/api/status');
-                    const data = await response.json();
-                    
-                    // Update last refresh time
-                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
-                    
-                    // Update status displays
-                    document.getElementById('totalVideos').textContent = data.total_videos || '--';
-                    document.getElementById('processedVideos').textContent = data.processed_videos || '--';
-                    document.getElementById('unprocessedVideos').textContent = data.unprocessed_videos || '--';
-                    document.getElementById('ffmpegStatus').textContent = data.ffmpeg_available ? 'Available' : 'Not Found';
-                    document.getElementById('wordCount').textContent = data.word_count || '--';
-                    
-                    // Check if processing is active
-                    const queueResponse = await fetch('/api/queue');
-                    const queueData = await queueResponse.json();
-                    
-                    const stateElement = document.getElementById('processingState');
-                    const iconElement = document.getElementById('processingIcon');
-                    
-                    if (queueData.current_job) {
-                        stateElement.textContent = 'Active';
-                        stateElement.className = 'text-2xl font-bold text-green-600 pulse-green';
-                        iconElement.className = 'w-12 h-12 text-green-500 animate-spin';
-                        iconElement.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>';
-                    } else {
-                        stateElement.textContent = 'Idle';
-                        stateElement.className = 'text-2xl font-bold text-gray-600';
-                        iconElement.className = 'w-12 h-12 text-gray-500';
-                        iconElement.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
-                    }
-                    
-                } catch (error) {
-                    console.error('Error fetching status:', error);
-                }
-            }
+        }, 10000);
 
-            async function refreshStatistics() {
-                try {
-                    const response = await fetch('/api/statistics');
-                    const data = await response.json();
-                    
-                    const fileStats = data.file_stats;
-                    const procStats = data.processing_stats;
-                    
-                    document.getElementById('totalSize').textContent = `${fileStats.total_size_gb.toFixed(1)} GB`;
-                    document.getElementById('successRate').textContent = `${procStats.success_rate}%`;
-                } catch (error) {
-                    console.error('Error fetching statistics:', error);
-                }
-            }
+        // Initial load
+        refreshStatus();
+        refreshHistory();
+        refreshFailures();
+        updateQueueCount();
+        
+        // Update queue count every 2 seconds
+        setInterval(updateQueueCount, 2000);
 
-            async function refreshHistory() {
-                try {
-                    const response = await fetch('/api/history?limit=15');
-                    const data = await response.json();
+        // Toggle collapsible sections
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const iconId = sectionId === 'statsSection' ? 'statsIcon' : 'systemIcon';
+            const icon = document.getElementById(iconId);
+            
+            section.classList.toggle('open');
+            icon.classList.toggle('open');
+        }
+        
+        async function updateQueueCount() {
+            try {
+                const response = await fetch('/api/queue');
+                const data = await response.json();
+                
+                const total = data.pending_count + (data.current_job ? 1 : 0);
+                document.getElementById('queueCount').textContent = total;
+            } catch (error) {
+                console.error('Error fetching queue count:', error);
+            }
+        }
+        
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                // Update last refresh time
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                
+                // Update status displays
+                const total = data.total_videos || 0;
+                const processed = data.processed_videos || 0;
+                const unprocessed = data.unprocessed_videos || 0;
+                
+                document.getElementById('totalVideos').textContent = total;
+                document.getElementById('processedVideos').textContent = processed;
+                document.getElementById('unprocessedVideos').textContent = unprocessed;
+                document.getElementById('ffmpegStatus').textContent = data.ffmpeg_available ? 'Available' : 'Not Found';
+                document.getElementById('wordCount').textContent = data.profanity_words || '--';
+                document.getElementById('subtitlesStatus').textContent = data.opensubtitles_enabled ? 'Enabled' : 'Disabled';
+                
+                // Calculate % complete (processed / total, excluding failed)
+                const percentComplete = total > 0 ? Math.round((processed / total) * 100) : 0;
+                document.getElementById('percentComplete').textContent = percentComplete + '%';
+                
+                // Check if processing is active
+                const queueResponse = await fetch('/api/queue');
+                const queueData = await queueResponse.json();
+                
+                const stateElement = document.getElementById('processingState');
+                const iconElement = document.getElementById('processingIcon');
+                
+                if (queueData.current_job) {
+                    stateElement.textContent = 'Active';
+                    stateElement.className = 'text-2xl font-bold text-green-600 pulse-green';
+                    iconElement.className = 'w-10 h-10 text-green-500 animate-spin';
+                    iconElement.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>';
+                } else {
+                    stateElement.textContent = 'Idle';
+                    stateElement.className = 'text-2xl font-bold text-gray-600';
+                    iconElement.className = 'w-10 h-10 text-gray-500';
+                    iconElement.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+                }
+                
+            } catch (error) {
+                console.error('Error fetching status:', error);
+            }
+        }
+
+        async function refreshHistory() {
+            try {
+                const response = await fetch('/api/history?limit=15');
+                const data = await response.json();
+                
+                const container = document.getElementById('recentActivity');
+                container.innerHTML = '';
+                
+                if (data.history.length === 0) {
+                    container.innerHTML = '<p class="p-4 text-gray-500">No processing history yet</p>';
+                    return;
+                }
+                
+                data.history.forEach(entry => {
+                    const div = document.createElement('div');
+                    div.className = 'p-4 hover:bg-gray-50';
                     
-                    const container = document.getElementById('recentActivity');
-                    container.innerHTML = '';
+                    const success = entry.success;
+                    const statusClass = success ? 'text-green-600' : 'text-red-600';
+                    const statusIcon = success ? '✓' : '✗';
                     
-                    if (data.history.length === 0) {
-                        container.innerHTML = '<p class="p-4 text-gray-500">No processing history yet</p>';
-                        return;
-                    }
+                    const videoName = entry.video_path.split('/').pop();
+                    const timestamp = new Date(entry.timestamp).toLocaleString();
                     
-                    data.history.forEach(entry => {
-                        const div = document.createElement('div');
-                        div.className = 'p-4 hover:bg-gray-50';
-                        
-                        const success = entry.success;
-                        const statusClass = success ? 'text-green-600' : 'text-red-600';
-                        const statusIcon = success ? '✓' : '✗';
-                        
-                        const videoName = entry.video_path.split('/').pop();
-                        const timestamp = new Date(entry.timestamp).toLocaleString();
-                        
-                        div.innerHTML = `
-                            <div class="flex justify-between items-start">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <span class="${statusClass} font-bold">${statusIcon}</span>
-                                        <span class="font-medium">${videoName}</span>
-                                    </div>
-                                    <div class="text-sm text-gray-500 mt-1">${timestamp}</div>
-                                    ${entry.segments_muted ? `<div class="text-sm text-blue-600 mt-1">Segments muted: ${entry.segments_muted}</div>` : ''}
-                                    ${entry.scene_zones_processed ? `<div class="text-sm text-purple-600 mt-1">Scene zones: ${entry.scene_zones_processed}</div>` : ''}
-                                    ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error.substring(0, 100)}${entry.error.length > 100 ? '...' : ''}</div>` : ''}
+                    div.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="${statusClass} font-bold">${statusIcon}</span>
+                                    <span class="font-medium">${videoName}</span>
                                 </div>
+                                <div class="text-sm text-gray-500 mt-1">${timestamp}</div>
+                                ${entry.segments_muted ? `<div class="text-sm text-blue-600 mt-1">Segments muted: ${entry.segments_muted}</div>` : ''}
+                                ${entry.scene_zones_processed ? `<div class="text-sm text-purple-600 mt-1">Scene zones: ${entry.scene_zones_processed}</div>` : ''}
+                                ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error.substring(0, 100)}${entry.error.length > 100 ? '...' : ''}</div>` : ''}
                             </div>
-                        `;
-                        
-                        container.appendChild(div);
-                    });
-                } catch (error) {
-                    console.error('Error fetching history:', error);
-                }
+                        </div>
+                    `;
+                    
+                    container.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error fetching history:', error);
             }
+        }
 
-            async function refreshFailures() {
-                try {
-                    const response = await fetch('/api/failures');
-                    const data = await response.json();
-                    
-                    const container = document.getElementById('failedVideos');
-                    container.innerHTML = '';
-                    
-                    if (data.failures.length === 0) {
-                        container.innerHTML = '<p class="p-4 text-gray-500">No failures! 🎉</p>';
-                        return;
-                    }
-                    
-                    data.failures.slice(0, 15).forEach(entry => {
-                        const div = document.createElement('div');
-                        div.className = 'p-4 hover:bg-gray-50';
-                        
-                        const videoName = entry.video_path.split('/').pop();
-                        const error = entry.error || 'Unknown error';
-                        const escapedPath = entry.video_path.replace(/'/g, "\\'");
-                        
-                        // Extract relative path (everything after the base input directory)
-                        // This will show something like "Mandalorian/Season01/S01E03.mkv"
-                        const pathParts = entry.video_path.split('/');
-                        const relevantPath = pathParts.slice(-3).join('/'); // Last 3 parts: Series/Season/Episode
-                        
-                        div.innerHTML = `
-                            <div>
-                                <div class="font-medium text-red-600">${videoName}</div>
-                                <div class="text-xs text-gray-500 mt-1">${relevantPath}</div>
-                                <div class="text-sm text-gray-600 mt-1">${error.substring(0, 100)}${error.length > 100 ? '...' : ''}</div>
-                                <div class="mt-2 flex gap-2">
-                                    <button 
-                                        onclick="bypassVideo('${escapedPath}')" 
-                                        class="text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                                        title="Copy video directly to output without processing"
-                                    >
-                                        Bypass
-                                    </button>
-                                    <button 
-                                        onclick="resetVideo('${escapedPath}')" 
-                                        class="text-sm px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600"
-                                    >
-                                        Reset
-                                    </button>
-                                    <button 
-                                        onclick="retryVideo('${escapedPath}')" 
-                                        class="text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                    >
-                                        Retry
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                        
-                        container.appendChild(div);
-                    });
-                } catch (error) {
-                    console.error('Error fetching failures:', error);
-                }
-            }
-
-            let searchTimeout;
-            async function searchVideos() {
-                clearTimeout(searchTimeout);
+        async function refreshFailures() {
+            try {
+                const response = await fetch('/api/failures');
+                const data = await response.json();
                 
-                const query = document.getElementById('searchInput').value;
-                if (query.length < 2) {
-                    document.getElementById('searchResults').innerHTML = '';
+                // Update failed count in stats
+                document.getElementById('failedVideos').textContent = data.total || 0;
+                
+                const listContainer = document.getElementById('failedVideosList');
+                
+                listContainer.innerHTML = '';
+                
+                if (data.failures.length === 0) {
+                    listContainer.innerHTML = '<p class="p-4 text-gray-500">No failures! 🎉</p>';
                     return;
                 }
                 
-                searchTimeout = setTimeout(async () => {
-                    try {
-                        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-                        const data = await response.json();
-                        
-                        const container = document.getElementById('searchResults');
-                        container.innerHTML = '';
-                        
-                        if (data.matches.length === 0) {
-                            container.innerHTML = '<p class="text-gray-500 p-2">No matches found</p>';
-                            return;
-                        }
-                        
-                        data.matches.forEach(path => {
-                            const div = document.createElement('div');
-                            div.className = 'p-2 hover:bg-blue-50 cursor-pointer rounded';
-                            div.textContent = path.split('/').pop();
-                            div.onclick = () => selectVideo(path);
-                            container.appendChild(div);
-                        });
-                    } catch (error) {
-                        console.error('Error searching:', error);
-                    }
-                }, 300);
-            }
-
-            function selectVideo(path) {
-                selectedVideoPath = path;
-                document.getElementById('searchInput').value = path.split('/').pop();
-                document.getElementById('searchResults').innerHTML = '';
-            }
-
-            async function processSelected() {
-                if (!selectedVideoPath) {
-                    alert('Please search and select a video first');
-                    return;
-                }
-                
-                const videoName = selectedVideoPath.split('/').pop();
-                
-                try {
-                    const response = await fetch('/api/process', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ video_path: selectedVideoPath })
-                    });
+                data.failures.slice(0, 10).forEach(entry => {
+                    const div = document.createElement('div');
+                    div.className = 'p-4 hover:bg-gray-50';
                     
-                    const data = await response.json();
+                    const videoName = entry.video_path.split('/').pop();
+                    const error = entry.error || 'Unknown error';
+                    const escapedPath = entry.video_path.replace(/'/g, "\\'");
                     
-                    if (data.success) {
-                        alert(`✅ ${videoName} added to processing queue!\n\nThe video will be processed in the background. Visit the Queue page to watch progress.`);
-                        selectedVideoPath = null;
-                        document.getElementById('searchInput').value = '';
-                        updateQueueCount();
-                    } else {
-                        alert('Error: ' + (data.error || 'Failed to add to queue'));
-                    }
-                } catch (error) {
-                    alert('Error adding to queue: ' + error.message);
-                }
+                    const pathParts = entry.video_path.split('/');
+                    const relevantPath = pathParts.slice(-3).join('/');
+                    
+                    div.innerHTML = `
+                        <div>
+                            <div class="font-medium text-red-600">${videoName}</div>
+                            <div class="text-xs text-gray-500 mt-1">${relevantPath}</div>
+                            <div class="text-sm text-gray-600 mt-1">${error.substring(0, 80)}${error.length > 80 ? '...' : ''}</div>
+                            <div class="mt-2 flex gap-2">
+                                <button onclick="bypassVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700">Bypass</button>
+                                <button onclick="resetVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-orange-500 text-white rounded hover:bg-orange-600">Reset</button>
+                                <button onclick="retryVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Retry</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    listContainer.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error fetching failures:', error);
+            }
+        }
+            
+        async function processAll() {
+            const unprocessedCount = document.getElementById('unprocessedVideos').textContent;
+            
+            if (unprocessedCount === '--' || unprocessedCount === '0') {
+                alert('No unprocessed videos found!');
+                return;
             }
             
-            async function processAll() {
-                // Get current unprocessed count
-                const unprocessedCount = document.getElementById('unprocessedVideos').textContent;
-                
-                if (unprocessedCount === '--' || unprocessedCount === '0') {
-                    alert('No unprocessed videos found!');
-                    return;
-                }
-                
-                if (!confirm(`Queue ${unprocessedCount} video(s) for processing?\n\nAll unprocessed videos will be added to the processing queue and processed in the background.`)) {
-                    return;
-                }
-                
-                try {
-                    const response = await fetch('/api/process-all', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        alert(`✅ ${data.queued} video(s) added to processing queue!\n\nVideos will be processed in the background. Visit the Queue page to watch progress.`);
-                        updateQueueCount();
-                    } else {
-                        alert('Error: ' + (data.error || 'Failed to add to queue'));
-                    }
-                } catch (error) {
-                    alert('Error adding to queue: ' + error.message);
-                }
+            if (!confirm(`Queue ${unprocessedCount} video(s) for processing?\n\nAll unprocessed videos will be added to the queue.`)) {
+                return;
             }
             
-            async function resetVideo(videoPath) {
-                if (!confirm(`Reset ${videoPath.split('/').pop()}?\n\nThis will remove it from the failed list so it can be retried in the next batch job.`)) {
-                    return;
-                }
+            try {
+                const response = await fetch('/api/process-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
                 
-                try {
-                    const response = await fetch('/api/reset', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ video_path: videoPath })
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        alert('Video reset successfully! It will be retried in the next batch job.');
-                        refreshFailures();
-                        refreshStatistics();
-                    } else {
-                        alert('Error: ' + (data.message || 'Reset failed'));
-                    }
-                } catch (error) {
-                    alert('Error resetting video: ' + error.message);
-                }
-            }
-
-            async function retryVideo(videoPath) {
-                if (!confirm(`Retry ${videoPath.split('/').pop()}?`)) {
-                    return;
-                }
+                const data = await response.json();
                 
-                try {
-                    await fetch('/api/reset', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ video_path: videoPath })
-                    });
-                    
-                    const response = await fetch('/api/process', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ video_path: videoPath })
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        alert('Retry started! Check Recent Activity for updates.');
-                        refreshHistory();
-                        refreshFailures();
-                    } else {
-                        alert('Error: ' + (data.error || 'Retry failed'));
-                    }
-                } catch (error) {
-                    alert('Error retrying video: ' + error.message);
+                if (data.success) {
+                    alert(`✅ ${data.queued} video(s) added to queue!`);
+                    updateQueueCount();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to add to queue'));
                 }
+            } catch (error) {
+                alert('Error: ' + error.message);
             }
-
-            // Bypass single video function
-            async function bypassVideo(videoPath) {
-                if (!confirm(`Bypass ${videoPath.split('/').pop()}?\n\nThis will copy the video directly to output without processing.`)) {
-                    return;
-                }
+        }
+        
+        async function resetVideo(videoPath) {
+            if (!confirm(`Reset ${videoPath.split('/').pop()}?`)) return;
+            
+            try {
+                const response = await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
                 
-                try {
-                    const response = await fetch('/api/bypass', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ video_path: videoPath })
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        alert('Video bypassed successfully!');
-                        refreshFailures();
-                        refreshStatistics();
-                    } else {
-                        alert('Error: ' + (data.message || 'Bypass failed'));
-                    }
-                } catch (error) {
-                    alert('Error bypassing video: ' + error.message);
-                }
-            }
-            // File Browser Functions
-            async function openBrowseModal() {
-                document.getElementById('browseModal').classList.add('show');
-                await loadBrowseDirectory('');
-            }
-
-            function closeBrowseModal() {
-                document.getElementById('browseModal').classList.remove('show');
-            }
-
-            async function loadBrowseDirectory(path) {
-                try {
-                    currentBrowsePath = path;
-                    const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
-                    const data = await response.json();
-                    
-                    document.getElementById('currentPath').textContent = data.current_path;
-                    
-                    const container = document.getElementById('browseItems');
-                    container.innerHTML = '';
-                    
-                    data.items.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = 'p-3 hover:bg-blue-50 cursor-pointer rounded border-b flex items-center gap-3';
-                        
-                        if (item.type === 'directory') {
-                            div.innerHTML = `
-                                <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                                </svg>
-                                <span class="flex-1 font-medium">${item.name}</span>
-                            `;
-                            div.onclick = () => loadBrowseDirectory(item.path);
-                        } else {
-                            const sizeGB = (item.size / (1024 ** 3)).toFixed(2);
-                            div.innerHTML = `
-                                <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
-                                </svg>
-                                <span class="flex-1">${item.name}</span>
-                                <span class="text-sm text-gray-500">${sizeGB} GB</span>
-                            `;
-                            div.onclick = () => {
-                                selectVideo(item.path);
-                                closeBrowseModal();
-                            };
-                        }
-                        
-                        container.appendChild(div);
-                    });
-                } catch (error) {
-                    console.error('Error loading directory:', error);
-                    alert('Error loading directory: ' + error.message);
-                }
-            }
-
-            // Word List Editor Functions
-            async function openWordListModal() {
-                document.getElementById('wordListModal').classList.add('show');
+                const data = await response.json();
                 
-                try {
-                    const response = await fetch('/api/wordlist');
-                    const data = await response.json();
-                    
-                    const editor = document.getElementById('wordListEditor');
-                    editor.value = data.words.join('\n');
-                    updateWordListCount();
-                } catch (error) {
-                    console.error('Error loading word list:', error);
-                    alert('Error loading word list: ' + error.message);
+                if (data.success) {
+                    alert('Video reset!');
+                    refreshFailures();
+                    refreshStatus();
+                } else {
+                    alert('Error: ' + (data.message || 'Reset failed'));
                 }
+            } catch (error) {
+                alert('Error: ' + error.message);
             }
+        }
 
-            function closeWordListModal() {
-                document.getElementById('wordListModal').classList.remove('show');
+        async function retryVideo(videoPath) {
+            if (!confirm(`Retry ${videoPath.split('/').pop()}?`)) return;
+            
+            try {
+                await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Retry queued!');
+                    refreshHistory();
+                    refreshFailures();
+                    updateQueueCount();
+                } else {
+                    alert('Error: ' + (data.error || 'Retry failed'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
             }
+        }
 
-            function updateWordListCount() {
+        async function bypassVideo(videoPath) {
+            if (!confirm(`Bypass ${videoPath.split('/').pop()}?\n\nThis copies the video to output without processing.`)) return;
+            
+            try {
+                const response = await fetch('/api/bypass', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Video bypassed!');
+                    refreshFailures();
+                    refreshStatus();
+                } else {
+                    alert('Error: ' + (data.message || 'Bypass failed'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Word List Modal Functions
+        async function openWordListModal() {
+            document.getElementById('wordListModal').classList.add('show');
+            
+            try {
+                const response = await fetch('/api/wordlist');
+                const data = await response.json();
+                
                 const editor = document.getElementById('wordListEditor');
-                const words = editor.value.split('\n').filter(line => line.trim() && !line.startsWith('#'));
-                document.getElementById('wordListCount').textContent = `${words.length} words`;
+                editor.value = data.words.join('\n');
+                updateWordListCount();
+            } catch (error) {
+                console.error('Error loading word list:', error);
+                alert('Error loading word list: ' + error.message);
             }
+        }
 
-            document.getElementById('wordListEditor').addEventListener('input', updateWordListCount);
+        function closeWordListModal() {
+            document.getElementById('wordListModal').classList.remove('show');
+        }
 
-            async function saveWordList() {
-                const editor = document.getElementById('wordListEditor');
-                const words = editor.value.split('\n')
-                    .map(line => line.trim())
-                    .filter(line => line && !line.startsWith('#'));
+        function updateWordListCount() {
+            const editor = document.getElementById('wordListEditor');
+            const words = editor.value.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+            document.getElementById('wordListCount').textContent = `${words.length} words`;
+        }
+
+        document.getElementById('wordListEditor').addEventListener('input', updateWordListCount);
+
+        async function saveWordList() {
+            const editor = document.getElementById('wordListEditor');
+            const words = editor.value.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && !line.startsWith('#'));
+            
+            if (!confirm(`Save ${words.length} words?`)) return;
+            
+            try {
+                const response = await fetch('/api/wordlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ words })
+                });
                 
-                if (!confirm(`Save ${words.length} words to the profanity list?`)) {
-                    return;
-                }
+                const data = await response.json();
                 
-                try {
-                    const response = await fetch('/api/wordlist', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ words })
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        alert(`Word list updated successfully! ${data.count} words saved.`);
-                        closeWordListModal();
-                        refreshStatus();
-                    } else {
-                        alert('Error: ' + (data.message || 'Save failed'));
-                    }
-                } catch (error) {
-                    alert('Error saving word list: ' + error.message);
+                if (data.success) {
+                    alert(`Saved ${data.count} words!`);
+                    closeWordListModal();
+                    refreshStatus();
+                } else {
+                    alert('Error: ' + (data.message || 'Save failed'));
                 }
+            } catch (error) {
+                alert('Error: ' + error.message);
             }
-        </script>
-    </body>
+        }
+    </script>
+</body>
 </html>

@@ -178,6 +178,12 @@ def failed_page():
     return send_from_directory('static', 'failed.html')
 
 
+@app.route('/browse.html')
+def browse_page():
+    """Serve the browse & process HTML."""
+    return send_from_directory('static', 'browse.html')
+
+
 @app.route('/api/status')
 def api_status():
     """Get current system status."""
