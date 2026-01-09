@@ -227,6 +227,9 @@ class VideoProcessor:
                     # Copy file
                     shutil.copy2(video_path, output_path)
                     
+                    # Copy SRT file (no redaction needed since no profanity was detected)
+                    self._copy_srt_for_clean_video(video_path, output_path, subtitle_file)
+                    
                     result.output_path = output_path
                     result.status = ProcessingStatus.SKIPPED
                     result.mark_complete(success=True, error="No profanity or scene filters - clean video copied")
@@ -689,6 +692,41 @@ class VideoProcessor:
         
         except Exception as e:
             print(f"  ⚠️  Warning: Failed to copy/adjust SRT: {e}")
+            # Don't fail the entire processing job if SRT copy fails
+    
+    def _copy_srt_for_clean_video(
+        self,
+        video_path: Path,
+        output_path: Path,
+        subtitle_file
+    ) -> None:
+        """
+        Copy SRT file to output directory for clean videos (no profanity detected).
+        
+        Since no profanity was detected, we just copy the SRT as-is.
+        
+        Args:
+            video_path: Original video path
+            output_path: Output video path
+            subtitle_file: SubtitleFile object from subtitle manager
+        """
+        try:
+            # Find the SRT file path
+            srt_path = self.subtitle_manager.find_subtitle_for_video(video_path)
+            
+            if not srt_path:
+                print(f"  ℹ️  No SRT file found to copy")
+                return
+            
+            # Generate output SRT path (same name as output video, .srt extension)
+            output_srt = output_path.with_suffix('.srt')
+            
+            # Simply copy the SRT file (no redaction needed since no profanity was detected)
+            shutil.copy2(srt_path, output_srt)
+            print(f"  ✓ SRT copied: {output_srt.name}")
+        
+        except Exception as e:
+            print(f"  ⚠️  Warning: Failed to copy SRT: {e}")
             # Don't fail the entire processing job if SRT copy fails
     
     def _redact_profanity_in_subtitle(self, subtitle_file):
