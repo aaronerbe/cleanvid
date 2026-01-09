@@ -153,14 +153,18 @@ class ProcessingStats:
     @property
     def processed(self) -> int:
         """Get number of videos processed (success or failed)."""
-        return self.successful + self.failed
+        #return self.successful + self.failed
+        #Only show successful as processed for clearer stats
+        return self.successful
     
     @property
     def success_rate(self) -> float:
         """Get success rate as percentage."""
         if self.processed == 0:
             return 0.0
-        return (self.successful / self.processed) * 100
+        #return (self.successful / self.processed) * 100
+        #Success rate based on failed vs successful for clearer stats
+        return (self.failed / self.successful) * 100
     
     @property
     def duration_seconds(self) -> float:
