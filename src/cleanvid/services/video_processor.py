@@ -645,10 +645,10 @@ class VideoProcessor:
             skip_zones: List of SkipZone objects that were applied
         """
         try:
-            # Find the SRT file path
-            srt_path = self.subtitle_manager.find_subtitle_for_video(video_path)
+            # Use the path from the already-loaded subtitle file
+            srt_path = subtitle_file.path if subtitle_file else None
             
-            if not srt_path:
+            if not srt_path or not srt_path.exists():
                 print(f"  ℹ️  No SRT file found to copy")
                 return
             
@@ -711,10 +711,10 @@ class VideoProcessor:
             subtitle_file: SubtitleFile object from subtitle manager
         """
         try:
-            # Find the SRT file path
-            srt_path = self.subtitle_manager.find_subtitle_for_video(video_path)
+            # Use the path from the already-loaded subtitle file
+            srt_path = subtitle_file.path if subtitle_file else None
             
-            if not srt_path:
+            if not srt_path or not srt_path.exists():
                 print(f"  ℹ️  No SRT file found to copy")
                 return
             
@@ -743,7 +743,7 @@ class VideoProcessor:
         import re
         
         # Get profanity word list from detector
-        profanity_patterns = self.profanity_detector.word_list
+        profanity_patterns = self.profanity_detector.profane_words
         
         # Create new subtitle file with redacted entries
         redacted_entries = []
