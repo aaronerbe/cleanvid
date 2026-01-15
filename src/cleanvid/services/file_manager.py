@@ -579,9 +579,16 @@ class FileManager:
             if video.exists()
         )
         
+        # Count processed videos that still exist in input
+        all_video_paths = {str(v) for v in all_videos}
+        processed_count = sum(
+            1 for path in self._processed_files
+            if path in all_video_paths
+        )
+        
         return {
             'total_videos': len(all_videos),
-            'processed_videos': len(self._processed_files),
+            'processed_videos': processed_count,
             'unprocessed_videos': len(unprocessed),
             'total_size_gb': total_size / (1024**3),
             'unprocessed_size_gb': unprocessed_size / (1024**3),

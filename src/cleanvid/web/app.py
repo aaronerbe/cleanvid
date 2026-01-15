@@ -184,6 +184,12 @@ def browse_page():
     return send_from_directory('static', 'browse.html')
 
 
+@app.route('/help.html')
+def help_page():
+    """Serve the help & documentation HTML."""
+    return send_from_directory('static', 'help.html')
+
+
 @app.route('/api/status')
 def api_status():
     """Get current system status."""

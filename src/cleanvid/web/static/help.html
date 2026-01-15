@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help & Documentation - Cleanvid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .toc-link { transition: color 0.2s; }
+        .toc-link:hover { color: #3b82f6; }
+        .section { scroll-margin-top: 80px; }
+        code { background-color: #1f2937; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre { background-color: #1f2937; padding: 16px; border-radius: 8px; overflow-x: auto; }
+        pre code { background: none; padding: 0; }
+        .config-table td, .config-table th { padding: 8px 12px; border: 1px solid #374151; }
+        .config-table th { background-color: #1f2937; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold">Cleanvid Documentation</h1>
+                    <p class="text-blue-100 text-sm">Automated Movie Profanity Filtering</p>
+                </div>
+                <a href="/" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded-lg transition">
+                    ← Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-8 flex gap-8">
+        <!-- Table of Contents - Sidebar -->
+        <aside class="hidden lg:block w-64 flex-shrink-0">
+            <nav class="sticky top-24 bg-gray-800 rounded-lg p-4">
+                <h2 class="text-lg font-bold mb-4 text-blue-400">Contents</h2>
+                <ul class="space-y-2 text-sm">
+                    <li><a href="#overview" class="toc-link text-gray-300">Overview</a></li>
+                    <li><a href="#features" class="toc-link text-gray-300">Features</a></li>
+                    <li><a href="#web-dashboard" class="toc-link text-gray-300">Web Dashboard</a>
+                        <ul class="ml-4 mt-1 space-y-1">
+                            <li><a href="#dashboard-main" class="toc-link text-gray-400">Main Dashboard</a></li>
+                            <li><a href="#browse-process" class="toc-link text-gray-400">Browse & Process</a></li>
+                            <li><a href="#scene-editor" class="toc-link text-gray-400">Scene Editor</a></li>
+                            <li><a href="#queue-page" class="toc-link text-gray-400">Queue Management</a></li>
+                            <li><a href="#failed-page" class="toc-link text-gray-400">Failed Videos</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#cli-commands" class="toc-link text-gray-300">CLI Commands</a></li>
+                    <li><a href="#configuration" class="toc-link text-gray-300">Configuration</a></li>
+                    <li><a href="#deployment" class="toc-link text-gray-300">Deployment</a></li>
+                    <li><a href="#troubleshooting" class="toc-link text-gray-300">Troubleshooting</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 max-w-4xl">
+            
+            <!-- Overview -->
+            <section id="overview" class="section mb-12">
+                <h2 class="text-3xl font-bold text-blue-400 mb-4">Overview</h2>
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <p class="text-gray-300 mb-4">
+                        Cleanvid is an automated movie profanity filtering system designed for home media setups. 
+                        It processes video files by analyzing subtitles to detect profanity and uses FFmpeg to 
+                        create filtered versions with muted audio at those points.
+                    </p>
+                    <p class="text-gray-300 mb-4">
+                        <strong class="text-white">Why Cleanvid?</strong> Some media players (like Roku devices) 
+                        can't run real-time filtering plugins through Jellyfin/Plex. Cleanvid solves this by 
+                        pre-processing videos so they're ready to play on any device.
+                    </p>
+                    <div class="bg-gray-700 rounded p-4 mt-4">
+                        <h4 class="font-semibold text-white mb-2">How It Works:</h4>
+                        <ol class="list-decimal list-inside text-gray-300 space-y-1">
+                            <li>Finds or downloads subtitles for each video</li>
+                            <li>Scans subtitles for words in your profanity list</li>
+                            <li>Uses FFmpeg to mute audio during profanity timestamps</li>
+                            <li>Optionally applies scene filters (blur, black, skip)</li>
+                            <li>Copies the filtered SRT with profanity redacted</li>
+                            <li>Outputs clean video to your filtered media directory</li>
+                        </ol>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Features -->
+            <section id="features" class="section mb-12">
+                <h2 class="text-3xl font-bold text-blue-400 mb-4">Features</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-semibold text-green-400 mb-2">🔇 Audio Muting</h3>
+                        <p class="text-gray-300 text-sm">Automatically mutes profanity detected in subtitles with configurable padding before/after each word.</p>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-semibold text-purple-400 mb-2">🎬 Scene Filtering</h3>
+                        <p class="text-gray-300 text-sm">Blur, black out, or completely skip scenes. Optionally mute audio during filtered scenes.</p>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-semibold text-blue-400 mb-2">📥 Subtitle Download</h3>
+                        <p class="text-gray-300 text-sm">Automatic subtitle download from OpenSubtitles when local subtitles aren't available.</p>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-semibold text-yellow-400 mb-2">📝 SRT Redaction</h3>
+                        <p class="text-gray-300 text-sm">Copies subtitles to output with profanity replaced by underscores (e.g., "damn" → "____").</p>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-semibold text-orange-400 mb-2">📁 Batch Processing</h3>
+                        <p class="text-gray-300 text-sm">Process entire folders recursively or queue individual videos through the web interface.</p>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-semibold text-red-400 mb-2">🐳 Docker Ready</h3>
+                        <p class="text-gray-300 text-sm">Runs in a Docker container with volume mounts. Perfect for NAS devices like Synology.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Web Dashboard -->
+            <section id="web-dashboard" class="section mb-12">
+                <h2 class="text-3xl font-bold text-blue-400 mb-4">Web Dashboard</h2>
+                
+                <!-- Main Dashboard -->
+                <div id="dashboard-main" class="bg-gray-800 rounded-lg p-6 mb-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">Main Dashboard</h3>
+                    <p class="text-gray-300 mb-4">The main dashboard provides an overview of your system and quick access to all features.</p>
+                    
+                    <h4 class="font-semibold text-blue-300 mt-4 mb-2">System Status (Collapsible)</h4>
+                    <ul class="list-disc list-inside text-gray-300 space-y-1 ml-4">
+                        <li><strong>Container:</strong> Shows if Cleanvid is running</li>
+                        <li><strong>FFmpeg:</strong> Shows if FFmpeg is available</li>
+                        <li><strong>OpenSubtitles:</strong> Shows if subtitle downloading is enabled</li>
+                        <li><strong>Word List:</strong> Click to edit your profanity word list</li>
+                        <li><strong>Processing:</strong> Shows if a video is currently being processed</li>
+                    </ul>
+
+                    <h4 class="font-semibold text-blue-300 mt-4 mb-2">Processing Statistics (Collapsible)</h4>
+                    <ul class="list-disc list-inside text-gray-300 space-y-1 ml-4">
+                        <li><strong>Total Videos:</strong> Total videos found in input directory</li>
+                        <li><strong>Processed:</strong> Successfully processed videos</li>
+                        <li><strong>Unprocessed:</strong> Videos waiting to be processed</li>
+                        <li><strong>Failed:</strong> Click to view failed videos</li>
+                        <li><strong>% Complete:</strong> Overall progress</li>
+                    </ul>
+
+                    <h4 class="font-semibold text-blue-300 mt-4 mb-2">Actions</h4>
+                    <ul class="list-disc list-inside text-gray-300 space-y-1 ml-4">
+                        <li><strong>Browse & Process:</strong> Select specific videos or folders to process</li>
+                        <li><strong>Process All:</strong> Queue all unprocessed videos</li>
+                        <li><strong>Scene Editor:</strong> Define blur/black/skip zones for videos</li>
+                        <li><strong>View Queue:</strong> See processing queue and control jobs</li>
+                    </ul>
+                </div>
+
+                <!-- Browse & Process -->
+                <div id="browse-process" class="bg-gray-800 rounded-lg p-6 mb-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">Browse & Process</h3>
+                    <p class="text-gray-300 mb-4">Navigate your video library and select what to process.</p>
+                    
+                    <ul class="list-disc list-inside text-gray-300 space-y-2 ml-4">
+                        <li>Click folders to navigate into them</li>
+                        <li>Click the path breadcrumb to go back</li>
+                        <li>Videos show their processing status (✓ processed, ⏳ pending, ✗ failed)</li>
+                        <li><strong>"Process This Folder"</strong> queues all videos in the current folder AND all subfolders</li>
+                        <li>Click individual videos to queue them for processing</li>
+                    </ul>
+                </div>
+
+                <!-- Scene Editor -->
+                <div id="scene-editor" class="bg-gray-800 rounded-lg p-6 mb-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">Scene Editor</h3>
+                    <p class="text-gray-300 mb-4">Define custom scene zones for videos that need visual filtering.</p>
+                    
+                    <h4 class="font-semibold text-blue-300 mt-4 mb-2">Processing Modes:</h4>
+                    <ul class="list-disc list-inside text-gray-300 space-y-2 ml-4">
+                        <li><strong class="text-red-400">Skip:</strong> Completely removes the scene from the video (output is shorter)</li>
+                        <li><strong class="text-yellow-400">Blur:</strong> Applies Gaussian blur to the video during the time range</li>
+                        <li><strong class="text-gray-400">Black:</strong> Replaces video with black frames during the time range</li>
+                        <li><strong class="text-purple-400">Mute:</strong> Optional audio muting during blur/black scenes</li>
+                    </ul>
+
+                    <h4 class="font-semibold text-blue-300 mt-4 mb-2">How to Use:</h4>
+                    <ol class="list-decimal list-inside text-gray-300 space-y-1 ml-4">
+                        <li>Select a video from the browser</li>
+                        <li>Enter start time (HH:MM:SS or MM:SS format)</li>
+                        <li>Enter end time</li>
+                        <li>Add a description (e.g., "Violence", "Nudity")</li>
+                        <li>Choose processing mode (Skip, Blur, or Black)</li>
+                        <li>Optionally enable "Mute audio" for blur/black modes</li>
+                        <li>Click "Add Zone" to save</li>
+                        <li>Add the video to the queue when done</li>
+                    </ol>
+
+                    <div class="bg-gray-700 rounded p-4 mt-4">
+                        <p class="text-yellow-400 text-sm">
+                            <strong>⚠️ Note:</strong> Scene filters require video re-encoding, which takes longer than audio-only processing.
+                            Skip mode uses a two-pass process: first mutes profanity, then cuts the scenes.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Queue Page -->
+                <div id="queue-page" class="bg-gray-800 rounded-lg p-6 mb-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">Queue Management</h3>
+                    <p class="text-gray-300 mb-4">Monitor and control the processing queue.</p>
+                    
+                    <h4 class="font-semibold text-blue-300 mt-4 mb-2">Queue Controls:</h4>
+                    <ul class="list-disc list-inside text-gray-300 space-y-2 ml-4">
+                        <li><strong class="text-red-400">⛔ Stop Now:</strong> Kills FFmpeg immediately and stops current job</li>
+                        <li><strong class="text-yellow-400">⏸️ Pause Queue:</strong> Lets current job finish, then pauses</li>
+                        <li><strong class="text-green-400">▶️ Resume Queue:</strong> Resumes processing after pause</li>
+                        <li><strong class="text-blue-400">🔄 Force Reset:</strong> Clears stuck states and resets queue</li>
+                        <li><strong class="text-gray-400">🗑️ Clear Pending:</strong> Removes all pending jobs from queue</li>
+                    </ul>
+
+                    <h4 class="font-semibold text-blue-300 mt-4 mb-2">Job Information:</h4>
+                    <p class="text-gray-300 ml-4">Each job shows: video name, filter counts (blur/black/skip/profanity), processing step, and time elapsed.</p>
+                </div>
+
+                <!-- Failed Page -->
+                <div id="failed-page" class="bg-gray-800 rounded-lg p-6 mb-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">Failed Videos</h3>
+                    <p class="text-gray-300 mb-4">View and manage videos that failed processing.</p>
+                    
+                    <h4 class="font-semibold text-blue-300 mt-4 mb-2">Actions for Failed Videos:</h4>
+                    <ul class="list-disc list-inside text-gray-300 space-y-2 ml-4">
+                        <li><strong class="text-green-400">Bypass:</strong> Copy video to output without filtering (marks as processed)</li>
+                        <li><strong class="text-orange-400">Reset:</strong> Clear failure status so video can be retried</li>
+                        <li><strong class="text-blue-400">Retry:</strong> Reset and immediately queue for reprocessing</li>
+                    </ul>
+
+                    <h4 class="font-semibold text-blue-300 mt-4 mb-2">Bulk Actions:</h4>
+                    <ul class="list-disc list-inside text-gray-300 space-y-1 ml-4">
+                        <li><strong>Bypass All:</strong> Bypass all failed videos</li>
+                        <li><strong>Reset All:</strong> Reset all failed videos</li>
+                        <li><strong>Retry All:</strong> Queue all failed videos for retry</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- CLI Commands -->
+            <section id="cli-commands" class="section mb-12">
+                <h2 class="text-3xl font-bold text-blue-400 mb-4">CLI Commands</h2>
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <p class="text-gray-300 mb-4">Cleanvid includes a full command-line interface. Access it via Docker:</p>
+                    <pre class="mb-6"><code class="text-green-400">docker exec -it cleanvid2 cleanvid [command]</code></pre>
+
+                    <h3 class="text-xl font-semibold text-white mb-4">Available Commands</h3>
+                    
+                    <!-- init -->
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-blue-300 mb-2">cleanvid init</h4>
+                        <p class="text-gray-300 mb-2">Initialize configuration files in the config directory.</p>
+                        <pre><code>cleanvid init [--config DIR]</code></pre>
+                    </div>
+
+                    <!-- status -->
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-blue-300 mb-2">cleanvid status</h4>
+                        <p class="text-gray-300 mb-2">Show current system status including video counts and FFmpeg availability.</p>
+                        <pre><code>cleanvid status [--config DIR]</code></pre>
+                    </div>
+
+                    <!-- process -->
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-blue-300 mb-2">cleanvid process</h4>
+                        <p class="text-gray-300 mb-2">Process videos in batch mode or a single video.</p>
+                        <pre><code>cleanvid process [VIDEO] [OPTIONS]
+
+Options:
+  VIDEO              Process specific video file
+  --max-videos N     Maximum number of videos to process
+  --max-time MINS    Maximum processing time in minutes
+  --force            Reprocess already processed videos</code></pre>
+                        <p class="text-gray-400 text-sm mt-2">Examples:</p>
+                        <pre class="text-sm"><code>cleanvid process                           # Batch process
+cleanvid process --max-time 300            # Process for 5 hours
+cleanvid process /input/movie.mkv          # Process single video
+cleanvid process --force                   # Reprocess all</code></pre>
+                    </div>
+
+                    <!-- history -->
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-blue-300 mb-2">cleanvid history</h4>
+                        <p class="text-gray-300 mb-2">Show processing history.</p>
+                        <pre><code>cleanvid history [--limit N]
+
+Options:
+  --limit N    Number of entries to show (default: 20)</code></pre>
+                    </div>
+
+                    <!-- reset -->
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-blue-300 mb-2">cleanvid reset</h4>
+                        <p class="text-gray-300 mb-2">Reset processing status for videos.</p>
+                        <pre><code>cleanvid reset [VIDEO] [OPTIONS]
+
+Options:
+  VIDEO              Reset specific video
+  --filter failed    Reset all failed videos
+  --filter all       Reset all processed videos</code></pre>
+                    </div>
+
+                    <!-- config -->
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-blue-300 mb-2">cleanvid config</h4>
+                        <p class="text-gray-300 mb-2">Show or validate configuration.</p>
+                        <pre><code>cleanvid config [OPTIONS]
+
+Options:
+  --show        Show configuration summary
+  --validate    Validate configuration files</code></pre>
+                    </div>
+
+                    <!-- web -->
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-blue-300 mb-2">cleanvid web</h4>
+                        <p class="text-gray-300 mb-2">Start the web dashboard (default command in Docker).</p>
+                        <pre><code>cleanvid web [OPTIONS]
+
+Options:
+  --port PORT    Port to run web server (default: 8080)
+  --host HOST    Host to bind to (default: 0.0.0.0)</code></pre>
+                    </div>
+
+                    <!-- Global Options -->
+                    <div class="bg-gray-700 rounded p-4 mt-6">
+                        <h4 class="font-semibold text-white mb-2">Global Options</h4>
+                        <pre><code>--config DIR    Configuration directory (default: /config)
+--verbose, -v   Enable debug logging
+--quiet, -q     Suppress console output
+--version       Show version</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Configuration -->
+            <section id="configuration" class="section mb-12">
+                <h2 class="text-3xl font-bold text-blue-400 mb-4">Configuration</h2>
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <p class="text-gray-300 mb-4">Configuration is stored in <code>/config/settings.json</code>.</p>
+                    
+                    <h3 class="text-xl font-semibold text-white mb-4">settings.json</h3>
+                    <table class="config-table w-full text-sm mb-6">
+                        <thead>
+                            <tr>
+                                <th class="text-left">Setting</th>
+                                <th class="text-left">Default</th>
+                                <th class="text-left">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr>
+                                <td colspan="3" class="bg-gray-700 font-semibold text-white">processing</td>
+                            </tr>
+                            <tr>
+                                <td>max_daily_processing</td>
+                                <td>5</td>
+                                <td>Max videos per batch run</td>
+                            </tr>
+                            <tr>
+                                <td>max_processing_time_minutes</td>
+                                <td>300</td>
+                                <td>Max batch processing time</td>
+                            </tr>
+                            <tr>
+                                <td>video_extensions</td>
+                                <td>[".mkv", ".mp4", ...]</td>
+                                <td>File types to process</td>
+                            </tr>
+                            <tr>
+                                <td>mute_padding_before_ms</td>
+                                <td>500</td>
+                                <td>Mute padding before word (ms)</td>
+                            </tr>
+                            <tr>
+                                <td>mute_padding_after_ms</td>
+                                <td>500</td>
+                                <td>Mute padding after word (ms)</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="bg-gray-700 font-semibold text-white">paths</td>
+                            </tr>
+                            <tr>
+                                <td>input_dir</td>
+                                <td>/input</td>
+                                <td>Source video directory</td>
+                            </tr>
+                            <tr>
+                                <td>output_dir</td>
+                                <td>/output</td>
+                                <td>Filtered video output</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="bg-gray-700 font-semibold text-white">opensubtitles</td>
+                            </tr>
+                            <tr>
+                                <td>enabled</td>
+                                <td>true</td>
+                                <td>Enable subtitle downloading</td>
+                            </tr>
+                            <tr>
+                                <td>language</td>
+                                <td>"en"</td>
+                                <td>Subtitle language code</td>
+                            </tr>
+                            <tr>
+                                <td>username/password</td>
+                                <td>null</td>
+                                <td>OpenSubtitles credentials</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="bg-gray-700 font-semibold text-white">ffmpeg</td>
+                            </tr>
+                            <tr>
+                                <td>threads</td>
+                                <td>2</td>
+                                <td>FFmpeg thread count</td>
+                            </tr>
+                            <tr>
+                                <td>audio_codec</td>
+                                <td>"aac"</td>
+                                <td>Output audio codec</td>
+                            </tr>
+                            <tr>
+                                <td>audio_bitrate</td>
+                                <td>"192k"</td>
+                                <td>Output audio bitrate</td>
+                            </tr>
+                            <tr>
+                                <td>re_encode_video</td>
+                                <td>false</td>
+                                <td>Re-encode video (slower)</td>
+                            </tr>
+                            <tr>
+                                <td>video_crf</td>
+                                <td>23</td>
+                                <td>Video quality (lower=better)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3 class="text-xl font-semibold text-white mb-4">profanity_words.txt</h3>
+                    <p class="text-gray-300 mb-4">One word per line. Supports wildcards:</p>
+                    <pre><code># Comments start with #
+damn
+hell
+sh*t        # Matches shoot, shut, etc.
+f*ck        # Matches any f-word variant</code></pre>
+                    <p class="text-gray-400 text-sm mt-2">Edit via the web dashboard by clicking the "Word List" stat card.</p>
+                </div>
+            </section>
+
+            <!-- Deployment -->
+            <section id="deployment" class="section mb-12">
+                <h2 class="text-3xl font-bold text-blue-400 mb-4">Deployment</h2>
+                <div class="bg-gray-800 rounded-lg p-6">
+                    
+                    <h3 class="text-xl font-semibold text-white mb-4">Docker Compose (Recommended)</h3>
+                    <p class="text-gray-300 mb-4">Create a <code>docker-compose.yml</code> file:</p>
+                    <pre><code>version: '3.8'
+
+services:
+  cleanvid2:
+    build: .
+    image: cleanvid:2.0
+    container_name: cleanvid2
+    
+    volumes:
+      # Mount your video directories
+      - /volume1/Videos:/input:ro              # Read-only input
+      - /volume1/Videos-Filtered:/output       # Writable output
+      - /volume1/docker/cleanvid2/config:/config
+      - /volume1/docker/cleanvid2/logs:/logs
+    
+    ports:
+      - "8080:8080"                             # Web dashboard
+    
+    environment:
+      - TZ=America/New_York                    # Your timezone
+    
+    command: web
+    restart: unless-stopped
+    
+    # Optional resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G</code></pre>
+
+                    <h3 class="text-xl font-semibold text-white mt-8 mb-4">Deployment Steps</h3>
+                    <ol class="list-decimal list-inside text-gray-300 space-y-2 ml-4">
+                        <li>Clone or copy the Cleanvid repository to your server</li>
+                        <li>Create the config and logs directories</li>
+                        <li>Edit <code>docker-compose.yml</code> with your paths</li>
+                        <li>Build and start: <code>docker-compose up -d --build</code></li>
+                        <li>Access dashboard at <code>http://your-server:8080</code></li>
+                        <li>Edit the word list via the dashboard</li>
+                        <li>Start processing videos!</li>
+                    </ol>
+
+                    <h3 class="text-xl font-semibold text-white mt-8 mb-4">Directory Structure</h3>
+                    <pre><code>/volume1/docker/cleanvid2/
+├── config/
+│   ├── settings.json         # Main configuration
+│   ├── profanity_words.txt   # Word list
+│   ├── processed_log.json    # Processing history
+│   └── scene_filters/        # Scene filter definitions
+└── logs/
+    └── cleanvid.log          # Application logs</code></pre>
+
+                    <h3 class="text-xl font-semibold text-white mt-8 mb-4">Useful Docker Commands</h3>
+                    <pre><code># View logs
+docker logs cleanvid2 -f
+
+# Restart container
+docker restart cleanvid2
+
+# Stop container
+docker stop cleanvid2
+
+# Rebuild after code changes
+docker-compose up -d --build
+
+# Execute CLI commands
+docker exec -it cleanvid2 cleanvid status
+docker exec -it cleanvid2 cleanvid history</code></pre>
+                </div>
+            </section>
+
+            <!-- Troubleshooting -->
+            <section id="troubleshooting" class="section mb-12">
+                <h2 class="text-3xl font-bold text-blue-400 mb-4">Troubleshooting</h2>
+                <div class="bg-gray-800 rounded-lg p-6">
+                    
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-yellow-400 mb-2">Video fails with "No subtitle file found"</h4>
+                        <ul class="list-disc list-inside text-gray-300 ml-4">
+                            <li>Ensure the video has an SRT file with the same name, or</li>
+                            <li>Enable OpenSubtitles in settings with valid credentials</li>
+                            <li>Check that the subtitle language matches your setting</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-yellow-400 mb-2">Processing is slow</h4>
+                        <ul class="list-disc list-inside text-gray-300 ml-4">
+                            <li>Scene filters (blur/black/skip) require video re-encoding</li>
+                            <li>Audio-only processing (just profanity) is much faster</li>
+                            <li>Increase <code>ffmpeg.threads</code> if your CPU supports it</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-yellow-400 mb-2">Queue stuck in "Processing" state</h4>
+                        <ul class="list-disc list-inside text-gray-300 ml-4">
+                            <li>Use the "Force Reset" button on the Queue page</li>
+                            <li>Or restart the container: <code>docker restart cleanvid2</code></li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-yellow-400 mb-2">SRT not copied to output</h4>
+                        <ul class="list-disc list-inside text-gray-300 ml-4">
+                            <li>Check logs for "Warning: Failed to copy/adjust SRT"</li>
+                            <li>Ensure output directory is writable</li>
+                            <li>SRT copying happens after video processing succeeds</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-6">
+                        <h4 class="font-semibold text-yellow-400 mb-2">OpenSubtitles rate limit</h4>
+                        <ul class="list-disc list-inside text-gray-300 ml-4">
+                            <li>Free accounts: 20 downloads per 24 hours</li>
+                            <li>Consider VIP account ($10/year) for unlimited</li>
+                            <li>Pre-download subtitles and place alongside videos</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-gray-700 rounded p-4 mt-6">
+                        <h4 class="font-semibold text-white mb-2">Checking Logs</h4>
+                        <pre><code># Full logs
+docker logs cleanvid2
+
+# Follow logs in real-time
+docker logs cleanvid2 -f
+
+# Last 100 lines
+docker logs cleanvid2 --tail 100
+
+# Filter for errors
+docker logs cleanvid2 2>&1 | grep -i error</code></pre>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-gray-400 mt-12">
+        <div class="container mx-auto px-4 py-6 text-center">
+            <p>Cleanvid Documentation v1.0</p>
+        </div>
+    </footer>
+</body>
+</html>
