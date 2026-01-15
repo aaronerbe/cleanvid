@@ -190,6 +190,12 @@ def help_page():
     return send_from_directory('static', 'help.html')
 
 
+@app.route('/compare.html')
+def compare_page():
+    """Serve the video comparison HTML."""
+    return send_from_directory('static', 'compare.html')
+
+
 @app.route('/unprocessed.html')
 def unprocessed_page():
     """Serve the unprocessed videos HTML."""
@@ -912,6 +918,77 @@ def api_browse():
             'items': items
         })
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/video-comparison')
+def api_video_comparison():
+    """Get side-by-side comparison of input vs output videos."""
+    try:
+        proc = get_processor()
+        input_dir = proc.file_manager.path_config.input_dir
+        output_dir = proc.file_manager.path_config.output_dir
+        extensions = proc.file_manager.processing_config.video_extensions
+        
+        # Get all input videos (excluding Synology metadata)
+        input_videos = set()
+        for ext in extensions:
+            for p in input_dir.rglob(f'*{ext}'):
+                if '@eaDir' not in str(p):
+                    # Store relative path from input_dir
+                    rel_path = p.relative_to(input_dir)
+                    input_videos.add(str(rel_path))
+        
+        # Get all output videos (excluding Synology metadata)
+        output_videos = set()
+        for ext in extensions:
+            for p in output_dir.rglob(f'*{ext}'):
+                if '@eaDir' not in str(p):
+                    # Store relative path from output_dir
+                    rel_path = p.relative_to(output_dir)
+                    output_videos.add(str(rel_path))
+        
+        # Build comparison list
+        all_paths = sorted(input_videos | output_videos)
+        comparison = []
+        
+        matched = 0
+        missing_output = 0
+        orphaned_output = 0
+        
+        for rel_path in all_paths:
+            in_input = rel_path in input_videos
+            in_output = rel_path in output_videos
+            
+            if in_input and in_output:
+                status = 'matched'
+                matched += 1
+            elif in_input and not in_output:
+                status = 'missing_output'
+                missing_output += 1
+            else:
+                status = 'orphaned_output'
+                orphaned_output += 1
+            
+            comparison.append({
+                'input': rel_path if in_input else None,
+                'output': rel_path if in_output else None,
+                'status': status
+            })
+        
+        return jsonify({
+            'comparison': comparison,
+            'stats': {
+                'total_input': len(input_videos),
+                'total_output': len(output_videos),
+                'matched': matched,
+                'missing_output': missing_output,
+                'orphaned_output': orphaned_output
+            }
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 

@@ -148,9 +148,10 @@
                         <p class="text-gray-500 text-sm">Total Videos</p>
                         <p id="totalVideos" class="text-3xl font-bold text-blue-600">--</p>
                     </div>
-                    <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="window.location.href='/compare.html'">
                         <p class="text-gray-500 text-sm">Processed</p>
                         <p id="processedVideos" class="text-3xl font-bold text-green-600">--</p>
+                        <p class="text-xs text-green-600 mt-1">Click to compare</p>
                     </div>
                     <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="window.location.href='/unprocessed.html'">
                         <p class="text-gray-500 text-sm">Unprocessed</p>
@@ -354,9 +355,9 @@
                 document.getElementById('wordCount').textContent = data.profanity_words || '--';
                 document.getElementById('subtitlesStatus').textContent = data.opensubtitles_enabled ? 'Enabled' : 'Disabled';
                 
-                // Calculate % complete (processed / total, excluding failed)
-                // Calculate % complete (cap at 100%)
-                const percentComplete = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+                // Calculate % complete based on unprocessed count
+                // This is more accurate: (total - unprocessed) / total
+                const percentComplete = total > 0 ? Math.round(((total - unprocessed) / total) * 100) : 0;
                 document.getElementById('percentComplete').textContent = percentComplete + '%';
                 
                 // Check if processing is active
