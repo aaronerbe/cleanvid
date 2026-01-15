@@ -91,6 +91,13 @@ class SubtitleManager:
                 if skipped_empty > 0:
                     print(f"  Skipped {skipped_empty} empty subtitle entries")
                 
+                # Validate subtitle has enough entries to be useful
+                MIN_SUBTITLE_ENTRIES = 10
+                if len(entries) < MIN_SUBTITLE_ENTRIES:
+                    print(f"  ⚠️  WARNING: Subtitle file has only {len(entries)} entries (minimum: {MIN_SUBTITLE_ENTRIES})")
+                    print(f"  ⚠️  This may be an advertisement or corrupted subtitle file")
+                    raise ValueError(f"Subtitle file has only {len(entries)} entries - likely invalid or advertisement")
+                
                 return SubtitleFile(
                     path=srt_path,
                     entries=entries,
@@ -300,6 +307,13 @@ class SubtitleManager:
             subtitle_path = self.find_subtitle_for_video(video_path)
         
         if not subtitle_path:
+            return None
+        
+        # Check subtitle file extension
+        ext = subtitle_path.suffix.lower()
+        if ext in ['.ass', '.ssa']:
+            print(f"  ⚠️  WARNING: .ass/.ssa subtitle format not supported: {subtitle_path.name}")
+            print(f"  ⚠️  Please convert to .srt format or provide an .srt file")
             return None
         
         # Parse and return

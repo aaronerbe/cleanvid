@@ -142,6 +142,18 @@ class VideoProcessor:
             # Step 2: Detect profanity
             segments = self.profanity_detector.detect_in_subtitle_file(subtitle_file)
             
+            # Debug: Show profanity detection results
+            print(f"  🔍 Profanity detection: {len(segments)} segment(s) found")
+            if len(segments) > 0:
+                unique_words = set(s.word for s in segments)
+                print(f"  🔍 Words detected: {', '.join(sorted(unique_words)[:10])}{'...' if len(unique_words) > 10 else ''}")
+            else:
+                print(f"  🔍 Word list has {self.profanity_detector.get_word_count()} words loaded")
+                # Show sample of subtitle text for debugging
+                if subtitle_file.entries:
+                    sample_text = ' '.join([e.text for e in subtitle_file.entries[:5]])[:200]
+                    print(f"  🔍 Sample subtitle text: {sample_text}...")
+            
             # Step 2.5: Load and integrate scene filters
             video_filter_complex = None
             scene_zones_applied = 0
