@@ -172,6 +172,9 @@ class FileManager:
         """
         Get list of videos that haven't been processed yet.
         
+        A video is considered processed if its output file exists.
+        This is more reliable than checking the log which can get truncated.
+        
         Args:
             directory: Directory to search. If None, uses input_dir.
             recursive: If True, searches subdirectories.
@@ -181,10 +184,10 @@ class FileManager:
         """
         all_videos = self.discover_videos(directory, recursive)
         
-        # Filter out already processed files
+        # Filter to videos that don't have output files
         unprocessed = [
             video for video in all_videos
-            if str(video) not in self._processed_files
+            if not self.generate_output_path(video).exists()
         ]
         
         return unprocessed
