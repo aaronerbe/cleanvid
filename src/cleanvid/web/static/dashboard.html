@@ -152,9 +152,10 @@
                         <p class="text-gray-500 text-sm">Processed</p>
                         <p id="processedVideos" class="text-3xl font-bold text-green-600">--</p>
                     </div>
-                    <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="window.location.href='/unprocessed.html'">
                         <p class="text-gray-500 text-sm">Unprocessed</p>
                         <p id="unprocessedVideos" class="text-3xl font-bold text-yellow-600">--</p>
+                        <p class="text-xs text-yellow-500 mt-1">Click to view</p>
                     </div>
                     <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="window.location.href='/failed.html'">
                         <p class="text-gray-500 text-sm">Failed</p>
@@ -354,7 +355,8 @@
                 document.getElementById('subtitlesStatus').textContent = data.opensubtitles_enabled ? 'Enabled' : 'Disabled';
                 
                 // Calculate % complete (processed / total, excluding failed)
-                const percentComplete = total > 0 ? Math.round((processed / total) * 100) : 0;
+                // Calculate % complete (cap at 100%)
+                const percentComplete = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
                 document.getElementById('percentComplete').textContent = percentComplete + '%';
                 
                 // Check if processing is active

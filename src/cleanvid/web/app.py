@@ -190,6 +190,12 @@ def help_page():
     return send_from_directory('static', 'help.html')
 
 
+@app.route('/unprocessed.html')
+def unprocessed_page():
+    """Serve the unprocessed videos HTML."""
+    return send_from_directory('static', 'unprocessed.html')
+
+
 @app.route('/api/status')
 def api_status():
     """Get current system status."""
@@ -243,6 +249,43 @@ def api_failures():
             'failures': failures,
             'total': len(failures),
             'error_groups': error_groups
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/unprocessed')
+def api_unprocessed():
+    """Get unprocessed videos (input videos without corresponding output)."""
+    try:
+        proc = get_processor()
+        
+        # Get unprocessed videos
+        unprocessed = proc.file_manager.get_unprocessed_videos()
+        
+        # Build response with video info
+        videos = []
+        for video_path in unprocessed:
+            try:
+                size_bytes = video_path.stat().st_size if video_path.exists() else 0
+                videos.append({
+                    'path': str(video_path),
+                    'name': video_path.name,
+                    'size_mb': size_bytes / (1024 * 1024)
+                })
+            except:
+                videos.append({
+                    'path': str(video_path),
+                    'name': video_path.name,
+                    'size_mb': 0
+                })
+        
+        # Sort by path for consistent ordering
+        videos.sort(key=lambda v: v['path'])
+        
+        return jsonify({
+            'videos': videos,
+            'total': len(videos)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -356,6 +399,34 @@ def api_process_all():
                 'success': True,
                 'queued': len(video_paths),
                 'message': f'Added {len(video_paths)} video(s) to processing queue. Processing will begin shortly.'
+            })
+        else:
+            return jsonify({'error': 'Processing queue not available'}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/process-multiple', methods=['POST'])
+def api_process_multiple():
+    """Add multiple selected videos to the processing queue."""
+    try:
+        data = request.json
+        video_paths = data.get('video_paths', [])
+        
+        if not video_paths:
+            return jsonify({'error': 'video_paths required'}), 400
+        
+        proc = get_processor()
+        
+        # Add to queue
+        if hasattr(proc, 'processing_queue') and proc.processing_queue:
+            proc.processing_queue.add_pending_jobs(video_paths)
+            
+            return jsonify({
+                'success': True,
+                'queued': len(video_paths),
+                'message': f'Added {len(video_paths)} video(s) to processing queue.'
             })
         else:
             return jsonify({'error': 'Processing queue not available'}), 500

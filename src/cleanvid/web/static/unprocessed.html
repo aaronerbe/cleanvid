@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unprocessed Videos - Cleanvid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .video-item:hover { background-color: #f3f4f6; }
+        .video-item.selected { background-color: #dbeafe; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">Unprocessed Videos</h1>
+                    <p class="text-blue-100">Videos waiting to be filtered</p>
+                </div>
+                <a href="/" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded-lg transition">
+                    ← Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        
+        <!-- Summary & Actions -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <span class="text-2xl font-bold text-yellow-600" id="totalCount">--</span>
+                    <span class="text-gray-600 ml-2">unprocessed videos</span>
+                    <span class="text-gray-400 ml-2">(<span id="selectedCount">0</span> selected)</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="selectAll()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition">
+                        Select All
+                    </button>
+                    <button onclick="selectNone()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition">
+                        Select None
+                    </button>
+                    <button onclick="processSelected()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+                        🎬 Process Selected
+                    </button>
+                    <button onclick="processAll()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
+                        🚀 Process All
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex items-center gap-4">
+                <label class="text-gray-600">Filter:</label>
+                <input type="text" id="filterInput" placeholder="Search by filename..." 
+                       class="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                       oninput="filterVideos()">
+                <button onclick="clearFilter()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- Video List -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="max-h-[600px] overflow-y-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-3 text-left w-12">
+                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this.checked)">
+                            </th>
+                            <th class="px-4 py-3 text-left">Video</th>
+                            <th class="px-4 py-3 text-left">Folder</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="videoList">
+                        <tr>
+                            <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+                                Loading...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-12">
+        <div class="container mx-auto px-4 py-6 text-center">
+            <p>Cleanvid Dashboard v1.0 | <a href="/help.html" class="text-blue-400 hover:text-blue-300">Documentation</a></p>
+        </div>
+    </footer>
+
+    <script>
+        let allVideos = [];
+        let selectedVideos = new Set();
+
+        // Load unprocessed videos on page load
+        document.addEventListener('DOMContentLoaded', loadUnprocessedVideos);
+
+        async function loadUnprocessedVideos() {
+            try {
+                const response = await fetch('/api/unprocessed');
+                const data = await response.json();
+                
+                allVideos = data.videos || [];
+                document.getElementById('totalCount').textContent = data.total || 0;
+                
+                renderVideoList(allVideos);
+            } catch (error) {
+                console.error('Error loading unprocessed videos:', error);
+                document.getElementById('videoList').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-4 py-8 text-center text-red-500">
+                            Error loading videos: ${error.message}
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function renderVideoList(videos) {
+            const tbody = document.getElementById('videoList');
+            
+            if (videos.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+                            🎉 No unprocessed videos! All videos have been filtered.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = videos.map(video => {
+                const pathParts = video.path.split('/');
+                const filename = pathParts.pop();
+                const folder = pathParts.slice(-2).join('/');
+                const escapedPath = video.path.replace(/'/g, "\\'");
+                const isSelected = selectedVideos.has(video.path);
+                
+                return `
+                    <tr class="video-item border-b ${isSelected ? 'selected' : ''}" data-path="${video.path}">
+                        <td class="px-4 py-3">
+                            <input type="checkbox" 
+                                   ${isSelected ? 'checked' : ''} 
+                                   onchange="toggleSelect('${escapedPath}', this.checked)">
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-900">${filename}</div>
+                            ${video.size_mb ? `<div class="text-sm text-gray-500">${video.size_mb.toFixed(1)} MB</div>` : ''}
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 text-sm">${folder}</td>
+                        <td class="px-4 py-3 text-right">
+                            <button onclick="processVideo('${escapedPath}')" 
+                                    class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
+                                Process
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function toggleSelect(path, checked) {
+            if (checked) {
+                selectedVideos.add(path);
+            } else {
+                selectedVideos.delete(path);
+            }
+            updateSelectedCount();
+            updateRowHighlight(path, checked);
+        }
+
+        function updateRowHighlight(path, selected) {
+            const row = document.querySelector(`tr[data-path="${path}"]`);
+            if (row) {
+                row.classList.toggle('selected', selected);
+            }
+        }
+
+        function updateSelectedCount() {
+            document.getElementById('selectedCount').textContent = selectedVideos.size;
+            document.getElementById('selectAllCheckbox').checked = 
+                selectedVideos.size === allVideos.length && allVideos.length > 0;
+        }
+
+        function toggleSelectAll(checked) {
+            if (checked) {
+                allVideos.forEach(v => selectedVideos.add(v.path));
+            } else {
+                selectedVideos.clear();
+            }
+            updateSelectedCount();
+            renderVideoList(getFilteredVideos());
+        }
+
+        function selectAll() {
+            getFilteredVideos().forEach(v => selectedVideos.add(v.path));
+            updateSelectedCount();
+            renderVideoList(getFilteredVideos());
+        }
+
+        function selectNone() {
+            selectedVideos.clear();
+            updateSelectedCount();
+            renderVideoList(getFilteredVideos());
+        }
+
+        function getFilteredVideos() {
+            const filter = document.getElementById('filterInput').value.toLowerCase();
+            if (!filter) return allVideos;
+            return allVideos.filter(v => v.path.toLowerCase().includes(filter));
+        }
+
+        function filterVideos() {
+            renderVideoList(getFilteredVideos());
+        }
+
+        function clearFilter() {
+            document.getElementById('filterInput').value = '';
+            renderVideoList(allVideos);
+        }
+
+        async function processVideo(videoPath) {
+            if (!confirm(`Process ${videoPath.split('/').pop()}?`)) return;
+            
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Video queued for processing!');
+                    loadUnprocessedVideos();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to queue video'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function processSelected() {
+            if (selectedVideos.size === 0) {
+                alert('No videos selected!');
+                return;
+            }
+            
+            if (!confirm(`Queue ${selectedVideos.size} video(s) for processing?`)) return;
+            
+            try {
+                const response = await fetch('/api/process-multiple', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_paths: Array.from(selectedVideos) })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`${data.queued} video(s) queued for processing!`);
+                    selectedVideos.clear();
+                    loadUnprocessedVideos();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to queue videos'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function processAll() {
+            const count = allVideos.length;
+            if (count === 0) {
+                alert('No unprocessed videos!');
+                return;
+            }
+            
+            if (!confirm(`Queue ALL ${count} unprocessed video(s) for processing?\n\nThis may take a while.`)) return;
+            
+            try {
+                const response = await fetch('/api/process-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`${data.queued} video(s) queued for processing!`);
+                    loadUnprocessedVideos();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to queue videos'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
