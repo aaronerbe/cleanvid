@@ -566,7 +566,13 @@ class FileManager:
             Dictionary with file statistics.
         """
         all_videos = self.discover_videos()
-        unprocessed = self.get_unprocessed_videos()
+        
+        # Count processed by checking what exists in output directory
+        # This is more reliable than the log which can get truncated
+        processed_count = self._count_videos_in_output()
+        
+        # Unprocessed = total - processed (but at minimum 0)
+        unprocessed_count = max(0, len(all_videos) - processed_count)
         
         # Calculate total size
         total_size = sum(
@@ -574,24 +580,55 @@ class FileManager:
             if video.exists()
         )
         
+        # For unprocessed size, we need to check which input videos don't have output
+        unprocessed_videos = self._get_videos_without_output(all_videos)
         unprocessed_size = sum(
-            video.stat().st_size for video in unprocessed
+            video.stat().st_size for video in unprocessed_videos
             if video.exists()
         )
-        
-        # Calculate processed as total minus unprocessed
-        # This ensures the numbers always add up correctly
-        processed_count = len(all_videos) - len(unprocessed)
         
         return {
             'total_videos': len(all_videos),
             'processed_videos': processed_count,
-            'unprocessed_videos': len(unprocessed),
+            'unprocessed_videos': len(unprocessed_videos),
             'total_size_gb': total_size / (1024**3),
             'unprocessed_size_gb': unprocessed_size / (1024**3),
             'input_directory': str(self.path_config.input_dir),
             'output_directory': str(self.path_config.output_dir),
         }
+    
+    def _count_videos_in_output(self) -> int:
+        """
+        Count video files in output directory.
+        
+        Returns:
+            Number of video files in output.
+        """
+        output_dir = self.path_config.output_dir
+        if not output_dir.exists():
+            return 0
+        
+        count = 0
+        for ext in self.processing_config.video_extensions:
+            count += len(list(output_dir.rglob(f"*{ext}")))
+        return count
+    
+    def _get_videos_without_output(self, input_videos: List[Path]) -> List[Path]:
+        """
+        Get input videos that don't have corresponding output files.
+        
+        Args:
+            input_videos: List of input video paths.
+            
+        Returns:
+            List of input videos without output files.
+        """
+        unprocessed = []
+        for input_video in input_videos:
+            output_path = self.generate_output_path(input_video)
+            if not output_path.exists():
+                unprocessed.append(input_video)
+        return unprocessed
     
     def ensure_output_directory(self, output_path: Path) -> None:
         """
