@@ -212,25 +212,39 @@ class SubtitleManager:
             RuntimeError: If OpenSubtitles is disabled in config.
         """
         if not self.config.enabled:
+            debug.subtitle("Download skipped - OpenSubtitles disabled in config")
             raise RuntimeError(
                 "Subtitle downloading is disabled. Enable OpenSubtitles in configuration."
             )
         
         if not video_path.exists():
+            debug.subtitle(f"Download failed - video file not found", {'path': str(video_path)})
             raise FileNotFoundError(f"Video file not found: {video_path}")
         
         # Use config language if not specified
         if language is None:
             language = self.config.language
         
+        debug.subtitle(f"Attempting subtitle download", {
+            'video': video_path.name,
+            'language': language,
+            'provider': 'opensubtitles'
+        })
+        
         try:
             # Create Video object for subliminal
             video = Video.fromname(str(video_path))
+            debug.subtitle(f"Video parsed for search", {
+                'title': getattr(video, 'title', 'unknown'),
+                'year': getattr(video, 'year', 'unknown'),
+                'source': getattr(video, 'source', 'unknown')
+            })
             
             # Set language
             languages = {Language(language)}
             
             # Download best subtitles
+            debug.subtitle(f"Searching OpenSubtitles...")
             subtitles = download_best_subtitles(
                 {video},
                 languages,
@@ -238,40 +252,86 @@ class SubtitleManager:
             )
             
             if not subtitles or video not in subtitles or not subtitles[video]:
+                debug.subtitle(f"No subtitles found on OpenSubtitles", {
+                    'video': video_path.name,
+                    'language': language,
+                    'result': 'empty'
+                })
+                print(f"  ⚠️  No subtitles found on OpenSubtitles for: {video_path.name}")
                 return None
             
+            # Log what we found
+            found_subs = list(subtitles[video])
+            debug.subtitle(f"Subtitles found", {
+                'count': len(found_subs),
+                'first_match': {
+                    'id': getattr(found_subs[0], 'id', 'unknown'),
+                    'provider': getattr(found_subs[0], 'provider_name', 'unknown'),
+                    'language': str(getattr(found_subs[0], 'language', 'unknown')),
+                    'hearing_impaired': getattr(found_subs[0], 'hearing_impaired', False)
+                } if found_subs else None
+            })
+            
             # Save subtitles
-            subtitle = list(subtitles[video])[0]
+            subtitle = found_subs[0]
             
             # Determine output directory
             if output_dir is None:
                 output_dir = video_path.parent
             
             # Save subtitle
+            debug.subtitle(f"Saving subtitle to disk", {'output_dir': str(output_dir)})
             save_subtitles(video, subtitles[video], single=True, directory=str(output_dir))
             
             # Return path to saved subtitle
             subtitle_path = output_dir / f"{video_path.stem}.{language}.srt"
             if subtitle_path.exists():
+                debug.subtitle(f"Subtitle saved successfully", {'path': str(subtitle_path)})
+                print(f"  ✅ Downloaded subtitle: {subtitle_path.name}")
                 return subtitle_path
             
             # Try without language code
             subtitle_path = output_dir / f"{video_path.stem}.srt"
             if subtitle_path.exists():
+                debug.subtitle(f"Subtitle saved successfully (no lang code)", {'path': str(subtitle_path)})
+                print(f"  ✅ Downloaded subtitle: {subtitle_path.name}")
                 return subtitle_path
             
+            debug.subtitle(f"Subtitle download appeared to succeed but file not found", {
+                'expected_paths': [
+                    str(output_dir / f"{video_path.stem}.{language}.srt"),
+                    str(output_dir / f"{video_path.stem}.srt")
+                ]
+            })
             return None
         
         except Exception as e:
             # Check for rate limiting
             error_msg = str(e).lower()
+            error_type = type(e).__name__
+            
+            debug.subtitle(f"Download failed with exception", {
+                'video': video_path.name,
+                'error_type': error_type,
+                'error_message': str(e)[:500]
+            })
+            
             if 'rate' in error_msg or 'limit' in error_msg or '429' in error_msg or 'too many' in error_msg:
                 print(f"⚠️  OpenSubtitles RATE LIMIT reached")
                 print(f"   Free accounts: 20 downloads per 24 hours")
                 print(f"   Consider: VIP account ($10/year) for unlimited downloads")
                 print(f"   Or wait 24 hours before processing more videos")
+            elif 'unauthorized' in error_msg or '401' in error_msg or 'auth' in error_msg:
+                print(f"⚠️  OpenSubtitles AUTHENTICATION failed")
+                print(f"   Check your username/password in settings")
+            elif 'timeout' in error_msg or 'timed out' in error_msg:
+                print(f"⚠️  OpenSubtitles request TIMED OUT")
+                print(f"   Server may be slow or unavailable")
+            elif 'connection' in error_msg or 'network' in error_msg:
+                print(f"⚠️  OpenSubtitles CONNECTION failed")
+                print(f"   Check network connectivity")
             else:
-                print(f"Failed to download subtitles for {video_path}: {e}")
+                print(f"  ⚠️  Failed to download subtitles: {error_type}: {e}")
             return None
     
     def get_or_download_subtitle(
