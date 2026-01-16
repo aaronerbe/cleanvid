@@ -269,14 +269,12 @@ class VideoProcessor:
                 
                 # Update queue status for UI
                 if self.queue:
-                    from cleanvid.services.processing_queue import JobStep
                     self.queue.start_job(
                         video_path=str(video_path),
-                        steps=[JobStep(name="Copying clean video", status="running")],
-                        blur_count=0,
-                        black_count=0,
-                        skip_count=0,
-                        profanity_count=0
+                        blur=0,
+                        black=0,
+                        skip=0,
+                        profanity=0
                     )
                 
                 try:
