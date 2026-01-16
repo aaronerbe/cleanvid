@@ -228,7 +228,13 @@ class FileManager:
         video_path: Path,
         success: bool,
         segments_muted: int = 0,
-        error: Optional[str] = None
+        error: Optional[str] = None,
+        processing_time_seconds: float = 0,
+        words_filtered: Optional[List[str]] = None,
+        subtitle_downloaded: bool = False,
+        scene_zones_processed: int = 0,
+        output_path: Optional[Path] = None,
+        warnings: Optional[List[str]] = None
     ) -> None:
         """
         Mark a video as processed.
@@ -238,6 +244,12 @@ class FileManager:
             success: Whether processing was successful.
             segments_muted: Number of segments that were muted.
             error: Error message if processing failed.
+            processing_time_seconds: How long processing took.
+            words_filtered: List of profanity words that were muted.
+            subtitle_downloaded: Whether subtitle was downloaded from OpenSubtitles.
+            scene_zones_processed: Number of scene zones applied.
+            output_path: Path to output file.
+            warnings: Any warnings generated during processing.
         """
         # Only add to processed set if successful
         if success:
@@ -252,13 +264,19 @@ class FileManager:
             except:
                 log_entries = []
         
-        # Add new entry
+        # Add new entry with all available details
         entry = {
             'video_path': str(video_path),
             'timestamp': datetime.now().isoformat(),
             'success': success,
             'segments_muted': segments_muted,
-            'error': error
+            'error': error,
+            'processing_time_seconds': processing_time_seconds,
+            'words_filtered': words_filtered or [],
+            'subtitle_downloaded': subtitle_downloaded,
+            'scene_zones_processed': scene_zones_processed,
+            'output_path': str(output_path) if output_path else None,
+            'warnings': warnings or []
         }
         log_entries.append(entry)
         

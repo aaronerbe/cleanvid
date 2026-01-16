@@ -76,6 +76,7 @@ class ProcessingResult:
     has_custom_scenes: bool = False
     error_message: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
+    words_filtered: List[str] = field(default_factory=list)
     
     @property
     def duration_seconds(self) -> float:
@@ -129,6 +130,7 @@ class ProcessingResult:
             "duration_seconds": self.duration_seconds,
             "error_message": self.error_message,
             "warnings": self.warnings,
+            "words_filtered": self.words_filtered,
         }
     
     def __str__(self) -> str:

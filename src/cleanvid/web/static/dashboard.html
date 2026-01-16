@@ -275,6 +275,25 @@
 
     </main>
 
+    <!-- Video Details Modal -->
+    <div id="videoDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 id="modalVideoName" class="text-xl font-bold text-gray-900">Video Details</h3>
+                    <button onclick="closeVideoModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                
+                <div id="modalContent">
+                    <div class="text-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                        <p class="mt-2 text-gray-500">Loading details...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="bg-gray-800 text-white mt-12">
         <div class="container mx-auto px-4 py-6 text-center">
@@ -423,7 +442,8 @@
                 
                 data.history.forEach(entry => {
                     const div = document.createElement('div');
-                    div.className = 'p-4 hover:bg-gray-50';
+                    div.className = 'p-4 hover:bg-gray-50 cursor-pointer transition';
+                    div.onclick = () => showVideoDetails(entry.video_path);
                     
                     const success = entry.success;
                     const statusClass = success ? 'text-green-600' : 'text-red-600';
@@ -444,6 +464,7 @@
                                 ${entry.scene_zones_processed ? `<div class="text-sm text-purple-600 mt-1">Scene zones: ${entry.scene_zones_processed}</div>` : ''}
                                 ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error.substring(0, 100)}${entry.error.length > 100 ? '...' : ''}</div>` : ''}
                             </div>
+                            <span class="text-gray-400 text-sm">➤</span>
                         </div>
                     `;
                     
@@ -473,7 +494,12 @@
                 
                 data.failures.slice(0, 10).forEach(entry => {
                     const div = document.createElement('div');
-                    div.className = 'p-4 hover:bg-gray-50';
+                    div.className = 'p-4 hover:bg-gray-50 cursor-pointer transition';
+                    div.onclick = (e) => {
+                        // Don't open modal if clicking a button
+                        if (e.target.tagName === 'BUTTON') return;
+                        showVideoDetails(entry.video_path);
+                    };
                     
                     const videoName = entry.video_path.split('/').pop();
                     const error = entry.error || 'Unknown error';
@@ -483,15 +509,18 @@
                     const relevantPath = pathParts.slice(-3).join('/');
                     
                     div.innerHTML = `
-                        <div>
-                            <div class="font-medium text-red-600">${videoName}</div>
-                            <div class="text-xs text-gray-500 mt-1">${relevantPath}</div>
-                            <div class="text-sm text-gray-600 mt-1">${error.substring(0, 80)}${error.length > 80 ? '...' : ''}</div>
-                            <div class="mt-2 flex gap-2">
-                                <button onclick="bypassVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700">Bypass</button>
-                                <button onclick="resetVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-orange-500 text-white rounded hover:bg-orange-600">Reset</button>
-                                <button onclick="retryVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Retry</button>
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="font-medium text-red-600">${videoName}</div>
+                                <div class="text-xs text-gray-500 mt-1">${relevantPath}</div>
+                                <div class="text-sm text-gray-600 mt-1">${error.substring(0, 80)}${error.length > 80 ? '...' : ''}</div>
+                                <div class="mt-2 flex gap-2">
+                                    <button onclick="bypassVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700">Bypass</button>
+                                    <button onclick="resetVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-orange-500 text-white rounded hover:bg-orange-600">Reset</button>
+                                    <button onclick="retryVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Retry</button>
+                                </div>
                             </div>
+                            <span class="text-gray-400 text-sm">➤</span>
                         </div>
                     `;
                     
@@ -688,6 +717,189 @@
                 alert('Error: ' + error.message);
             }
         }
+        
+        // Video Details Modal
+        let currentVideoPath = null;
+        
+        async function showVideoDetails(videoPath) {
+            currentVideoPath = videoPath;
+            document.getElementById('videoDetailsModal').classList.remove('hidden');
+            document.getElementById('modalVideoName').textContent = videoPath.split('/').pop();
+            document.getElementById('modalContent').innerHTML = `
+                <div class="text-center py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p class="mt-2 text-gray-500">Loading details...</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`/api/video-details?path=${encodeURIComponent(videoPath)}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('modalContent').innerHTML = `
+                        <div class="text-red-600 p-4 bg-red-50 rounded">
+                            <p class="font-semibold">Error loading details</p>
+                            <p class="text-sm">${data.error}</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                renderVideoDetails(data);
+            } catch (error) {
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="text-red-600 p-4 bg-red-50 rounded">
+                        <p class="font-semibold">Error</p>
+                        <p class="text-sm">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderVideoDetails(data) {
+            const statusColor = data.success ? 'green' : 'red';
+            const statusText = data.success ? 'Success' : 'Failed';
+            const statusIcon = data.success ? '✓' : '✗';
+            
+            let html = `
+                <!-- Status Banner -->
+                <div class="mb-4 p-3 rounded-lg ${data.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
+                    <div class="flex items-center gap-2">
+                        <span class="text-${statusColor}-600 text-xl font-bold">${statusIcon}</span>
+                        <span class="text-${statusColor}-700 font-semibold">${statusText}</span>
+                        <span class="text-gray-500 text-sm ml-auto">${new Date(data.timestamp).toLocaleString()}</span>
+                    </div>
+                </div>
+                
+                <!-- Error Message (if failed) -->
+                ${data.error ? `
+                    <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p class="font-semibold text-red-700">Error:</p>
+                        <p class="text-red-600 text-sm mt-1">${data.error}</p>
+                    </div>
+                ` : ''}
+                
+                <!-- File Info -->
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-700 mb-2">File Information</h4>
+                    <div class="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                        <div class="flex justify-between"><span class="text-gray-500">Folder:</span><span class="text-gray-700 truncate ml-2" title="${data.folder}">${data.folder.split('/').slice(-2).join('/')}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Input Size:</span><span class="text-gray-700">${data.input_size_mb ? data.input_size_mb + ' MB' : 'N/A'}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Output Size:</span><span class="text-gray-700">${data.output_size_mb ? data.output_size_mb + ' MB' : 'N/A'}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Input Exists:</span><span class="${data.input_exists ? 'text-green-600' : 'text-red-600'}">${data.input_exists ? 'Yes' : 'No'}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Output Exists:</span><span class="${data.output_exists ? 'text-green-600' : 'text-red-600'}">${data.output_exists ? 'Yes' : 'No'}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Subtitle File:</span><span class="${data.srt_exists ? 'text-green-600' : 'text-yellow-600'}">${data.srt_exists ? 'Yes' : 'No'}</span></div>
+                    </div>
+                </div>
+                
+                <!-- Processing Details -->
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-700 mb-2">Processing Details</h4>
+                    <div class="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                        <div class="flex justify-between"><span class="text-gray-500">Processing Time:</span><span class="text-gray-700">${data.processing_time_display || 'N/A'}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Segments Muted:</span><span class="text-blue-600 font-semibold">${data.segments_muted || 0}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Scene Zones:</span><span class="text-purple-600 font-semibold">${data.scene_zones_processed || 0}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Subtitle Downloaded:</span><span class="text-gray-700">${data.subtitle_downloaded ? 'Yes' : 'No'}</span></div>
+                    </div>
+                </div>
+                
+                <!-- Words Filtered -->
+                ${data.words_filtered && data.words_filtered.length > 0 ? `
+                    <div class="mb-4">
+                        <h4 class="font-semibold text-gray-700 mb-2">Words Filtered (${data.words_filtered.length})</h4>
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <div class="flex flex-wrap gap-1">
+                                ${data.words_filtered.map(w => `<span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">${w}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Warnings -->
+                ${data.warnings && data.warnings.length > 0 ? `
+                    <div class="mb-4">
+                        <h4 class="font-semibold text-yellow-700 mb-2">⚠️ Warnings</h4>
+                        <div class="bg-yellow-50 rounded-lg p-3 text-sm">
+                            <ul class="list-disc list-inside space-y-1 text-yellow-700">
+                                ${data.warnings.map(w => `<li>${w}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Actions -->
+                <div class="border-t pt-4 mt-4">
+                    <h4 class="font-semibold text-gray-700 mb-3">Actions</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="modalRetry()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                            🔄 Retry
+                        </button>
+                        <button onclick="modalRetryNewSrt()" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+                            📥 Retry + New SRT
+                        </button>
+                        <button onclick="modalBypass()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                            ➡️ Bypass
+                        </button>
+                        <button onclick="modalReset()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">
+                            ↩️ Reset
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modalContent').innerHTML = html;
+        }
+        
+        function closeVideoModal() {
+            document.getElementById('videoDetailsModal').classList.add('hidden');
+            currentVideoPath = null;
+        }
+        
+        async function modalRetry() {
+            if (!currentVideoPath) return;
+            closeVideoModal();
+            await retryVideo(currentVideoPath);
+        }
+        
+        async function modalRetryNewSrt() {
+            if (!currentVideoPath) return;
+            if (!confirm('Delete existing SRT and retry with fresh subtitles?')) return;
+            closeVideoModal();
+            
+            try {
+                await fetch('/api/delete-srt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: currentVideoPath })
+                });
+                await retryVideo(currentVideoPath);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function modalBypass() {
+            if (!currentVideoPath) return;
+            closeVideoModal();
+            await bypassVideo(currentVideoPath);
+        }
+        
+        async function modalReset() {
+            if (!currentVideoPath) return;
+            closeVideoModal();
+            await resetVideo(currentVideoPath);
+        }
+        
+        // Close modal on backdrop click
+        document.getElementById('videoDetailsModal').addEventListener('click', (e) => {
+            if (e.target.id === 'videoDetailsModal') closeVideoModal();
+        });
+        
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeVideoModal();
+        });
         
         // Toast notification helper
         function showToast(message) {

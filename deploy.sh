@@ -1,4 +1,5 @@
 #!/bin/bash
+# Running the script under /scripts instead.  this one has an extra step to fix file ownership inside the container.
 set -e
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'

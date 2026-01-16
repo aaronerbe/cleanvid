@@ -11,8 +11,8 @@ echo -e "${CYAN}==>${NC} Pulling latest code..."
 docker exec git-helper /scripts/pull-cleanvid.sh
 
 # Fix file permissions (need sudo for chown)
-echo -e "${CYAN}==>${NC} Fixing file permissions..."
-sudo chown -R scum:users /volume1/docker/cleanvid2/
+#echo -e "${CYAN}==>${NC} Fixing file permissions..."
+#sudo chown -R scum:users /volume1/docker/cleanvid2/
 
 # Build on host (no sudo needed - you're in docker group)
 echo -e "${CYAN}==>${NC} Building Docker image..."

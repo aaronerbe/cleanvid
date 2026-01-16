@@ -591,6 +591,84 @@ def api_process_folder():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/video-details')
+def api_video_details():
+    """Get detailed information about a processed video."""
+    try:
+        video_path = request.args.get('path')
+        if not video_path:
+            return jsonify({'error': 'path parameter required'}), 400
+        
+        proc = get_processor()
+        
+        # Find entry in processed log
+        log_entries = []
+        if proc.file_manager.processed_log_path.exists():
+            with open(proc.file_manager.processed_log_path, 'r') as f:
+                log_entries = json.load(f)
+        
+        # Find the most recent entry for this video
+        entry = None
+        for e in reversed(log_entries):
+            if e.get('video_path') == video_path:
+                entry = e
+                break
+        
+        if not entry:
+            return jsonify({'error': 'Video not found in processing history'}), 404
+        
+        # Enrich with additional info
+        video_path_obj = Path(video_path)
+        
+        # Check if files exist
+        input_exists = video_path_obj.exists()
+        output_path = entry.get('output_path')
+        output_exists = Path(output_path).exists() if output_path else False
+        
+        # Check for subtitle file
+        srt_path = video_path_obj.with_suffix('.srt')
+        srt_exists = srt_path.exists()
+        
+        # Get file sizes if available
+        input_size_mb = round(video_path_obj.stat().st_size / (1024*1024), 1) if input_exists else None
+        output_size_mb = round(Path(output_path).stat().st_size / (1024*1024), 1) if output_exists else None
+        
+        # Format processing time
+        processing_time = entry.get('processing_time_seconds', 0)
+        if processing_time > 60:
+            time_str = f"{processing_time / 60:.1f} minutes"
+        else:
+            time_str = f"{processing_time:.1f} seconds"
+        
+        details = {
+            'video_path': video_path,
+            'video_name': video_path_obj.name,
+            'folder': str(video_path_obj.parent),
+            'timestamp': entry.get('timestamp'),
+            'success': entry.get('success'),
+            'error': entry.get('error'),
+            'segments_muted': entry.get('segments_muted', 0),
+            'words_filtered': entry.get('words_filtered', []),
+            'processing_time_seconds': processing_time,
+            'processing_time_display': time_str,
+            'subtitle_downloaded': entry.get('subtitle_downloaded', False),
+            'scene_zones_processed': entry.get('scene_zones_processed', 0),
+            'output_path': output_path,
+            'warnings': entry.get('warnings', []),
+            'input_exists': input_exists,
+            'output_exists': output_exists,
+            'srt_exists': srt_exists,
+            'srt_path': str(srt_path) if srt_exists else None,
+            'input_size_mb': input_size_mb,
+            'output_size_mb': output_size_mb
+        }
+        
+        return jsonify(details)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/delete-srt', methods=['POST'])
 def api_delete_srt():
     """Delete the SRT file for a video so it can be redownloaded."""
