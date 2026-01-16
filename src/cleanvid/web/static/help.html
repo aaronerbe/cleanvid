@@ -52,6 +52,7 @@
                     <li><a href="#cli-commands" class="toc-link text-gray-300">CLI Commands</a></li>
                     <li><a href="#configuration" class="toc-link text-gray-300">Configuration</a></li>
                     <li><a href="#deployment" class="toc-link text-gray-300">Deployment</a></li>
+                    <li><a href="#debug-tools" class="toc-link text-gray-300">Debug Tools</a></li>
                     <li><a href="#troubleshooting" class="toc-link text-gray-300">Troubleshooting</a></li>
                 </ul>
             </nav>
@@ -532,6 +533,78 @@ docker exec -it cleanvid2 cleanvid history</code></pre>
                 </div>
             </section>
 
+            <!-- Debug Tools -->
+            <section id="debug-tools" class="section mb-12">
+                <h2 class="text-3xl font-bold text-blue-400 mb-4">Debug Tools</h2>
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <p class="text-gray-300 mb-6">When troubleshooting processing issues, enable debug logging to see detailed information about each step of the processing pipeline.</p>
+                    
+                    <!-- Debug Toggle -->
+                    <div class="mb-6 p-4 bg-gray-700 rounded-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="font-semibold text-white">Debug Logging</h4>
+                                <p class="text-sm text-gray-400">Enable to see detailed processing logs</p>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <span id="debugStatus" class="text-sm px-3 py-1 rounded-full bg-gray-600 text-gray-300">Loading...</span>
+                                <button id="debugToggle" onclick="toggleDebug()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition">
+                                    Toggle
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button onclick="viewDebugLogs()" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
+                                View Logs
+                            </button>
+                            <button onclick="clearDebugLogs()" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
+                                Clear Logs
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Debug Log Viewer -->
+                    <div id="debugLogViewer" class="hidden">
+                        <h4 class="font-semibold text-white mb-2">Recent Debug Logs</h4>
+                        <div class="flex gap-2 mb-2">
+                            <button onclick="filterLogs('all')" class="log-filter px-2 py-1 bg-blue-600 rounded text-xs" data-filter="all">All</button>
+                            <button onclick="filterLogs('QUEUE')" class="log-filter px-2 py-1 bg-gray-600 rounded text-xs" data-filter="QUEUE">Queue</button>
+                            <button onclick="filterLogs('SUBTITLE')" class="log-filter px-2 py-1 bg-gray-600 rounded text-xs" data-filter="SUBTITLE">Subtitle</button>
+                            <button onclick="filterLogs('PROFANITY')" class="log-filter px-2 py-1 bg-gray-600 rounded text-xs" data-filter="PROFANITY">Profanity</button>
+                            <button onclick="filterLogs('DECISION')" class="log-filter px-2 py-1 bg-gray-600 rounded text-xs" data-filter="DECISION">Decision</button>
+                            <button onclick="filterLogs('FILE')" class="log-filter px-2 py-1 bg-gray-600 rounded text-xs" data-filter="FILE">File</button>
+                            <button onclick="filterLogs('SCENE')" class="log-filter px-2 py-1 bg-gray-600 rounded text-xs" data-filter="SCENE">Scene</button>
+                        </div>
+                        <div id="debugLogs" class="bg-gray-900 rounded p-4 max-h-96 overflow-y-auto font-mono text-xs">
+                            <p class="text-gray-500">Click "View Logs" to load debug entries...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Debug Categories -->
+                    <div class="mt-6">
+                        <h4 class="font-semibold text-white mb-2">Log Categories</h4>
+                        <table class="config-table w-full text-sm">
+                            <thead>
+                                <tr>
+                                    <th class="text-left">Category</th>
+                                    <th class="text-left">Information Logged</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-gray-300">
+                                <tr><td><code>QUEUE</code></td><td>Job start/complete, worker status, queue operations</td></tr>
+                                <tr><td><code>SUBTITLE</code></td><td>Subtitle file loading, encoding detection, entry count</td></tr>
+                                <tr><td><code>PROFANITY</code></td><td>Word list loading, detection results, matched words</td></tr>
+                                <tr><td><code>DECISION</code></td><td>Processing decisions (clean copy vs FFmpeg processing)</td></tr>
+                                <tr><td><code>FILE</code></td><td>File paths, output generation, permissions</td></tr>
+                                <tr><td><code>SCENE</code></td><td>Scene filter loading, zone detection</td></tr>
+                                <tr><td><code>FFMPEG</code></td><td>FFmpeg commands, filter chains, processing steps</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
             <!-- Troubleshooting -->
             <section id="troubleshooting" class="section mb-12">
                 <h2 class="text-3xl font-bold text-blue-400 mb-4">Troubleshooting</h2>
@@ -607,5 +680,117 @@ docker logs cleanvid2 2>&1 | grep -i error</code></pre>
             <p>Cleanvid Documentation v1.0</p>
         </div>
     </footer>
+
+    <script>
+        let currentFilter = 'all';
+        let allLogs = [];
+
+        // Load debug status on page load
+        async function loadDebugStatus() {
+            try {
+                const response = await fetch('/api/debug/status');
+                const data = await response.json();
+                updateDebugStatus(data.enabled);
+            } catch (error) {
+                console.error('Error loading debug status:', error);
+            }
+        }
+
+        function updateDebugStatus(enabled) {
+            const status = document.getElementById('debugStatus');
+            if (enabled) {
+                status.textContent = 'ENABLED';
+                status.className = 'text-sm px-3 py-1 rounded-full bg-green-600 text-white';
+            } else {
+                status.textContent = 'DISABLED';
+                status.className = 'text-sm px-3 py-1 rounded-full bg-gray-600 text-gray-300';
+            }
+        }
+
+        async function toggleDebug() {
+            try {
+                const response = await fetch('/api/debug/toggle', { method: 'POST' });
+                const data = await response.json();
+                updateDebugStatus(data.enabled);
+            } catch (error) {
+                console.error('Error toggling debug:', error);
+            }
+        }
+
+        async function viewDebugLogs() {
+            document.getElementById('debugLogViewer').classList.remove('hidden');
+            try {
+                const response = await fetch('/api/debug/logs?limit=200');
+                const data = await response.json();
+                allLogs = data.logs || [];
+                renderLogs();
+            } catch (error) {
+                document.getElementById('debugLogs').innerHTML = `<p class="text-red-400">Error loading logs: ${error.message}</p>`;
+            }
+        }
+
+        async function clearDebugLogs() {
+            try {
+                await fetch('/api/debug/clear', { method: 'POST' });
+                allLogs = [];
+                renderLogs();
+            } catch (error) {
+                console.error('Error clearing logs:', error);
+            }
+        }
+
+        function filterLogs(category) {
+            currentFilter = category;
+            // Update button styles
+            document.querySelectorAll('.log-filter').forEach(btn => {
+                if (btn.dataset.filter === category) {
+                    btn.className = 'log-filter px-2 py-1 bg-blue-600 rounded text-xs';
+                } else {
+                    btn.className = 'log-filter px-2 py-1 bg-gray-600 rounded text-xs';
+                }
+            });
+            renderLogs();
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('debugLogs');
+            let logs = allLogs;
+            
+            if (currentFilter !== 'all') {
+                logs = logs.filter(l => l.category === currentFilter);
+            }
+            
+            if (logs.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">No logs found. Enable debug logging and process a video to see entries.</p>';
+                return;
+            }
+            
+            const categoryColors = {
+                'QUEUE': 'text-blue-400',
+                'SUBTITLE': 'text-green-400',
+                'PROFANITY': 'text-red-400',
+                'DECISION': 'text-yellow-400',
+                'FILE': 'text-purple-400',
+                'SCENE': 'text-pink-400',
+                'FFMPEG': 'text-orange-400',
+                'DEBUG': 'text-gray-400'
+            };
+            
+            container.innerHTML = logs.map(log => {
+                const time = new Date(log.timestamp).toLocaleTimeString();
+                const color = categoryColors[log.category] || 'text-gray-400';
+                const dataStr = log.data ? `\n    ${JSON.stringify(log.data, null, 2).replace(/\n/g, '\n    ')}` : '';
+                return `<div class="mb-2 border-b border-gray-800 pb-2">
+                    <span class="text-gray-500">${time}</span>
+                    <span class="${color} font-bold">[${log.category}]</span>
+                    <span class="text-gray-300">${log.message}</span>
+                    ${dataStr ? `<pre class="text-gray-500 mt-1">${dataStr}</pre>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        // Load status on page load
+        loadDebugStatus();
+    </script>
 </body>
 </html>

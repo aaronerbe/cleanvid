@@ -128,6 +128,20 @@
                             </svg>
                         </div>
                     </div>
+
+                    <!-- Debug Mode Toggle -->
+                    <div class="stat-card bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg" onclick="toggleDebugMode()">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Debug Mode</p>
+                                <p id="debugStatus" class="text-lg font-bold text-gray-600">Off</p>
+                                <p class="text-xs text-blue-600 mt-1">Click to toggle</p>
+                            </div>
+                            <svg class="w-10 h-10 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                            </svg>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -355,6 +369,16 @@
                 document.getElementById('wordCount').textContent = data.profanity_words || '--';
                 document.getElementById('subtitlesStatus').textContent = data.opensubtitles_enabled ? 'Enabled' : 'Disabled';
                 
+                // Update debug status
+                const debugElement = document.getElementById('debugStatus');
+                if (data.debug_enabled) {
+                    debugElement.textContent = 'On';
+                    debugElement.className = 'text-lg font-bold text-green-600';
+                } else {
+                    debugElement.textContent = 'Off';
+                    debugElement.className = 'text-lg font-bold text-gray-600';
+                }
+                
                 // Calculate % complete based on unprocessed count
                 // This is more accurate: (total - unprocessed) / total
                 const percentComplete = total > 0 ? Math.round(((total - unprocessed) / total) * 100) : 0;
@@ -416,7 +440,7 @@
                                     <span class="font-medium">${videoName}</span>
                                 </div>
                                 <div class="text-sm text-gray-500 mt-1">${timestamp}</div>
-                                ${entry.segments_muted ? `<div class="text-sm text-blue-600 mt-1">Segments muted: ${entry.segments_muted}</div>` : ''}
+                                ${entry.segments_muted ? `<div class="text-sm text-blue-600 mt-1">Segments muted: ${entry.segments_muted}</div>` : (entry.success && !entry.error ? `<div class="text-sm text-green-600 mt-1">✓ Clean (no profanity detected)</div>` : '')}
                                 ${entry.scene_zones_processed ? `<div class="text-sm text-purple-600 mt-1">Scene zones: ${entry.scene_zones_processed}</div>` : ''}
                                 ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error.substring(0, 100)}${entry.error.length > 100 ? '...' : ''}</div>` : ''}
                             </div>
@@ -477,6 +501,25 @@
                 console.error('Error fetching failures:', error);
             }
         }
+        
+        async function toggleDebugMode() {
+            try {
+                const response = await fetch('/api/debug/toggle', { method: 'POST' });
+                const data = await response.json();
+                
+                // Update UI immediately
+                const debugElement = document.getElementById('debugStatus');
+                if (data.enabled) {
+                    debugElement.textContent = 'On';
+                    debugElement.className = 'text-lg font-bold text-green-600';
+                } else {
+                    debugElement.textContent = 'Off';
+                    debugElement.className = 'text-lg font-bold text-gray-600';
+                }
+            } catch (error) {
+                console.error('Error toggling debug mode:', error);
+            }
+        }
             
         async function processAll() {
             const unprocessedCount = document.getElementById('unprocessedVideos').textContent;
@@ -486,7 +529,7 @@
                 return;
             }
             
-            if (!confirm(`Queue ${unprocessedCount} video(s) for processing?\n\nAll unprocessed videos will be added to the queue.`)) {
+            if (!confirm(`Queue ${unprocessedCount} video(s) for processing?`)) {
                 return;
             }
             
@@ -499,7 +542,7 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert(`✅ ${data.queued} video(s) added to queue!`);
+                    // Silent success - update UI instead of alert
                     updateQueueCount();
                 } else {
                     alert('Error: ' + (data.error || 'Failed to add to queue'));
@@ -522,7 +565,7 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('Video reset!');
+                    // Silent success
                     refreshFailures();
                     refreshStatus();
                 } else {
@@ -552,7 +595,7 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('Retry queued!');
+                    // Silent success
                     refreshHistory();
                     refreshFailures();
                     updateQueueCount();
@@ -565,7 +608,7 @@
         }
 
         async function bypassVideo(videoPath) {
-            if (!confirm(`Bypass ${videoPath.split('/').pop()}?\n\nThis copies the video to output without processing.`)) return;
+            if (!confirm(`Bypass ${videoPath.split('/').pop()}?`)) return;
             
             try {
                 const response = await fetch('/api/bypass', {
@@ -577,7 +620,7 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('Video bypassed!');
+                    // Silent success
                     refreshFailures();
                     refreshStatus();
                 } else {
@@ -635,7 +678,7 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert(`Saved ${data.count} words!`);
+                    showToast(`✅ Saved ${data.count} words`);
                     closeWordListModal();
                     refreshStatus();
                 } else {
@@ -644,6 +687,18 @@
             } catch (error) {
                 alert('Error: ' + error.message);
             }
+        }
+        
+        // Toast notification helper
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
         }
     </script>
 </body>

@@ -10,6 +10,7 @@ from typing import List, Set, Optional
 
 from cleanvid.models.subtitle import SubtitleFile, SubtitleEntry
 from cleanvid.models.segment import MuteSegment
+from cleanvid.services.debug_logger import debug
 
 
 class ProfanityDetector:
@@ -69,6 +70,12 @@ class ProfanityDetector:
                     re.IGNORECASE
                 )
                 self.word_patterns.append(pattern)
+        
+        debug.profanity(f"Word list loaded", {
+            'path': str(self.word_list_path),
+            'word_count': len(self.profane_words),
+            'sample_words': list(self.profane_words)[:10]
+        })
     
     def reload_word_list(self) -> None:
         """Reload word list from disk."""
@@ -89,6 +96,12 @@ class ProfanityDetector:
         for pattern in self.word_patterns:
             matches = pattern.findall(text)
             detected.extend(matches)
+        
+        if detected:
+            debug.profanity(f"Words detected in text", {
+                'text_preview': text[:100],
+                'detected': detected
+            })
         
         return detected
     

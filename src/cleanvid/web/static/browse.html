@@ -270,7 +270,8 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert(`✅ ${videoName} added to queue!\n\nVisit the Queue page to watch progress.`);
+                    // Show brief toast-style feedback
+                    showToast(`✅ ${videoName} added to queue`);
                     selectedVideo = null;
                     updateSelectionUI();
                     // Remove selection styling
@@ -299,9 +300,9 @@
 
                 if (data.success) {
                     if (data.queued === 0) {
-                        alert('No video files found in this folder (or subfolders).');
+                        showToast('No video files found in this folder');
                     } else {
-                        alert(`✅ ${data.queued} video(s) added to queue!\n\nVisit the Queue page to watch progress.`);
+                        showToast(`✅ ${data.queued} video(s) added to queue`);
                     }
                 } else {
                     alert('Error: ' + (data.error || 'Failed to process folder'));
@@ -309,6 +310,18 @@
             } catch (error) {
                 alert('Error: ' + error.message);
             }
+        }
+        
+        // Toast notification helper
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
         }
     </script>
 </body>

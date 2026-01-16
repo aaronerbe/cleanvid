@@ -5,6 +5,7 @@ Handles video file processing including profanity detection and audio muting.
 """
 
 import shutil
+import os
 from pathlib import Path
 from typing import Optional, List
 from datetime import datetime
@@ -14,6 +15,7 @@ from cleanvid.models.segment import MuteSegment, merge_overlapping_segments, add
 from cleanvid.models.config import FFmpegConfig
 from cleanvid.services.subtitle_manager import SubtitleManager
 from cleanvid.services.profanity_detector import ProfanityDetector
+from cleanvid.services.debug_logger import debug
 from cleanvid.utils.ffmpeg_wrapper import FFmpegWrapper, FFprobeResult
 
 
@@ -123,36 +125,59 @@ class VideoProcessor:
         
         try:
             # Step 1: Load subtitle file
+            debug.subtitle(f"Loading subtitle for: {video_path.name}")
             subtitle_file = self.subtitle_manager.load_subtitle_file(
                 video_path,
                 auto_download=auto_download_subtitles
             )
             
             if subtitle_file is None:
+                debug.decision(f"FAILED: No subtitle file available", {
+                    'video': video_path.name,
+                    'auto_download_enabled': auto_download_subtitles
+                })
                 result.mark_complete(
                     success=False,
                     error="No subtitle file found or could not be downloaded"
                 )
                 return result
             
+            debug.subtitle(f"Subtitle loaded successfully", {
+                'path': str(subtitle_file.path),
+                'entries': len(subtitle_file.entries),
+                'encoding': subtitle_file.encoding
+            })
+            
             result.subtitle_downloaded = auto_download_subtitles and (
                 self.subtitle_manager.find_subtitle_for_video(video_path) is None
             )
             
             # Step 2: Detect profanity
+            debug.profanity(f"Starting profanity detection", {
+                'word_list_count': self.profanity_detector.get_word_count(),
+                'subtitle_entries': len(subtitle_file.entries)
+            })
+            
             segments = self.profanity_detector.detect_in_subtitle_file(subtitle_file)
             
-            # Debug: Show profanity detection results
+            # Always show profanity results (important info)
             print(f"  🔍 Profanity detection: {len(segments)} segment(s) found")
             if len(segments) > 0:
                 unique_words = set(s.word for s in segments)
                 print(f"  🔍 Words detected: {', '.join(sorted(unique_words)[:10])}{'...' if len(unique_words) > 10 else ''}")
+                debug.profanity(f"Profanity found", {
+                    'segment_count': len(segments),
+                    'unique_words': list(unique_words)[:20]
+                })
             else:
                 print(f"  🔍 Word list has {self.profanity_detector.get_word_count()} words loaded")
                 # Show sample of subtitle text for debugging
                 if subtitle_file.entries:
                     sample_text = ' '.join([e.text for e in subtitle_file.entries[:5]])[:200]
                     print(f"  🔍 Sample subtitle text: {sample_text}...")
+                debug.profanity(f"No profanity detected in subtitle", {
+                    'sample_text': sample_text if subtitle_file.entries else 'N/A'
+                })
             
             # Step 2.5: Load and integrate scene filters
             video_filter_complex = None
@@ -163,11 +188,9 @@ class VideoProcessor:
             black_zones = []
             skip_zones = []
             
-            print(f"  🔍 DEBUG: Checking for scene filters...")
-            print(f"  🔍 DEBUG: config_dir = {self.config_dir}")
+            debug.scene(f"Checking for scene filters", {'config_dir': str(self.config_dir)})
             
             if self.config_dir:
-                print(f"  🔍 DEBUG: config_dir exists, attempting to load scene filters")
                 try:
                     from cleanvid.services.scene_manager import SceneManager
                     from cleanvid.services.scene_processor import SceneProcessor
@@ -176,13 +199,14 @@ class VideoProcessor:
                     scene_mgr = SceneManager(self.config_dir)
                     scene_proc = SceneProcessor()
                     
-                    print(f"  🔍 DEBUG: Looking for filters for video: {str(video_path)}")
+                    debug.scene(f"Looking for filters for video", {'video_path': str(video_path)})
                     video_filters = scene_mgr.get_video_filters(str(video_path))
-                    print(f"  🔍 DEBUG: video_filters = {video_filters}")
                     
                     if video_filters and len(video_filters.skip_zones) > 0:
-                        print(f"  ✅ Found {len(video_filters.skip_zones)} scene skip zone(s)")
-                        print(f"  🔍 DEBUG: Skip zones: {[{'desc': z.description, 'mode': z.mode.value, 'start': z.start_time, 'end': z.end_time} for z in video_filters.skip_zones]}")
+                        print(f"  ✅ Found {len(video_filters.skip_zones)} scene zone(s)")
+                        debug.scene(f"Scene filters found", {
+                            'zones': [{'desc': z.description, 'mode': z.mode.value, 'start': z.start_time, 'end': z.end_time} for z in video_filters.skip_zones]
+                        })
                         
                         # Extract zones by type
                         skip_zones = video_filters.get_zones_by_mode(ProcessingMode.SKIP)
@@ -190,14 +214,19 @@ class VideoProcessor:
                         black_zones = video_filters.get_zones_by_mode(ProcessingMode.BLACK)
                         scene_mute_zones = video_filters.get_mute_zones()
                         
-                        print(f"  🔍 DEBUG: Skip zones: {len(skip_zones)}, Blur zones: {len(blur_zones)}, Black zones: {len(black_zones)}, Mute zones: {len(scene_mute_zones)}")
+                        debug.scene(f"Zones by type", {
+                            'skip': len(skip_zones),
+                            'blur': len(blur_zones), 
+                            'black': len(black_zones),
+                            'mute': len(scene_mute_zones)
+                        })
                         
                         # Generate BLUR/BLACK filters (SKIP handled later in two-pass logic)
                         if blur_zones or black_zones:
                             video_filter_complex = scene_proc.combine_video_filters(blur_zones, black_zones)
                             scene_zones_applied += len(blur_zones) + len(black_zones)
                             print(f"  ✅ Applying video filters: {len(blur_zones)} blur, {len(black_zones)} black")
-                            print(f"  🔍 DEBUG: Generated filter: {video_filter_complex}")
+                            debug.scene(f"Video filter generated", {'filter': video_filter_complex})
                         
                         # Note skip zones for later two-pass processing
                         if skip_zones:
@@ -220,24 +249,64 @@ class VideoProcessor:
                             segments = segments + scene_mute_segments
                             print(f"  ✅ Adding {len(scene_mute_segments)} scene mute zone(s)")
                     else:
-                        print(f"  ℹ️  No scene filters found for this video")
+                        debug.scene(f"No scene filters found for this video")
                         
                 except Exception as e:
                     print(f"  ⚠️  Warning: Failed to load scene filters: {e}")
-                    import traceback
-                    traceback.print_exc()
+                    debug.scene(f"Scene filter error", {'error': str(e)})
                     result.add_warning(f"Scene filters not applied: {e}")
-            else:
-                print(f"  ℹ️  config_dir is None, skipping scene filter loading")
             
+            # DECISION POINT: Determine processing path
             if len(segments) == 0 and not video_filter_complex:
                 # No profanity detected AND no scene filters - copy clean video to output
+                debug.decision(f"CLEAN VIDEO - No processing needed", {
+                    'video': video_path.name,
+                    'profanity_segments': 0,
+                    'scene_filters': False,
+                    'action': 'copy_to_output'
+                })
+                print(f"  ℹ️  Decision: Video is CLEAN - copying to output")
+                
+                # Update queue status for UI
+                if self.queue:
+                    from cleanvid.services.processing_queue import JobStep
+                    self.queue.start_job(
+                        video_path=str(video_path),
+                        steps=[JobStep(name="Copying clean video", status="running")],
+                        blur_count=0,
+                        black_count=0,
+                        skip_count=0,
+                        profanity_count=0
+                    )
+                
                 try:
-                    # Ensure output directory exists
+                    # Ensure output directory exists with proper permissions
                     output_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Fix directory permissions for NAS access
+                    # Walk up and fix all parent directories we may have created
+                    import os
+                    current = output_path.parent
+                    while str(current) != str(Path('/output')):
+                        try:
+                            os.chmod(current, 0o755)  # rwxr-xr-x for directories
+                        except:
+                            pass
+                        if current.parent == current:
+                            break
+                        current = current.parent
+                    
+                    debug.file(f"Copying video to output", {
+                        'source': str(video_path),
+                        'dest': str(output_path)
+                    })
                     
                     # Copy file
                     shutil.copy2(video_path, output_path)
+                    
+                    # Fix permissions for NAS access (make world-readable/writable)
+                    os.chmod(output_path, 0o666)
+                    debug.file(f"Permissions set to 0o666")
                     
                     # Copy SRT file (no redaction needed since no profanity was detected)
                     self._copy_srt_for_clean_video(video_path, output_path, subtitle_file)
@@ -249,10 +318,27 @@ class VideoProcessor:
                     
                     print(f"  ✓ Clean video copied to output")
                     
+                    # Complete queue job
+                    if self.queue:
+                        self.queue.update_step(0, "complete")
+                        self.queue.complete_job(success=True)
+                    
                 except Exception as copy_error:
                     result.mark_complete(success=False, error=f"Failed to copy clean video: {copy_error}")
+                    if self.queue:
+                        self.queue.update_step(0, "failed")
+                        self.queue.complete_job(success=False)
                 
                 return result
+            
+            # DECISION POINT: Processing required
+            debug.decision(f"PROCESSING REQUIRED", {
+                'video': video_path.name,
+                'profanity_segments': len(segments),
+                'scene_filters': bool(video_filter_complex),
+                'action': 'ffmpeg_processing'
+            })
+            print(f"  ℹ️  Decision: Processing required - {len(segments)} segment(s) to mute")
             
             # Step 3: Add padding and merge overlapping segments
             padded_segments = add_padding_to_segments(
@@ -261,10 +347,18 @@ class VideoProcessor:
                 after_ms=mute_padding_after_ms
             )
             
+            debug.profanity(f"Segments after padding", {
+                'original_count': len(segments),
+                'padded_count': len(padded_segments),
+                'padding_before_ms': mute_padding_before_ms,
+                'padding_after_ms': mute_padding_after_ms
+            })
+            
             result.segments_muted = len(padded_segments)
             
             # Step 4: Create FFmpeg filter chain for audio muting
             audio_filter_chain = create_ffmpeg_filter_chain(padded_segments)
+            debug.ffmpeg(f"Audio filter chain created", {'filter_length': len(audio_filter_chain) if audio_filter_chain else 0})
             
             # Count filters and start queue tracking
             blur_count = len(blur_zones)
@@ -735,6 +829,11 @@ class VideoProcessor:
             
             # Simply copy the SRT file (no redaction needed since no profanity was detected)
             shutil.copy2(srt_path, output_srt)
+            
+            # Fix permissions for NAS access
+            import os
+            os.chmod(output_srt, 0o666)
+            
             print(f"  ✓ SRT copied: {output_srt.name}")
         
         except Exception as e:

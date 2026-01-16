@@ -42,7 +42,10 @@ def background_queue_worker():
     """Background worker that processes pending queue jobs."""
     global worker_running, stop_current_job
     
+    from cleanvid.services.debug_logger import debug
+    
     print("🔄 Background queue worker started")
+    debug.queue("Background queue worker started")
     
     while worker_running:
         try:
@@ -63,6 +66,11 @@ def background_queue_worker():
                     job_type = getattr(next_job, 'job_type', 'process')  # Default to 'process' for backwards compat
                     
                     print(f"\n📹 Processing queued video: {video_path.name} (type: {job_type})")
+                    debug.queue(f"Starting job", {
+                        'video': video_path.name,
+                        'job_type': job_type,
+                        'pending_count': queue_status['pending_count']
+                    })
                     
                     # Remove from pending
                     proc.processing_queue.pending_jobs.pop(0)
@@ -95,14 +103,20 @@ def background_queue_worker():
                         proc.processing_queue._save()
                         
                         print(f"✅ Bypassed: {video_path.name}")
+                        debug.queue(f"Bypass complete", {'video': video_path.name, 'success': success})
                     else:
                         # PROCESS: Normal flow (detects profanity, applies scene filters)
                         print(f"  ⚙️  Processing - will detect profanity and apply any scene filters")
+                        debug.queue(f"Starting normal processing", {'video': video_path.name})
                         
                         output_path = proc.file_manager.generate_output_path(
                             video_path,
                             preserve_structure=True
                         )
+                        debug.file(f"Output path generated", {
+                            'input': str(video_path),
+                            'output': str(output_path)
+                        })
                         
                         proc.file_manager.ensure_output_directory(output_path)
                         
@@ -115,6 +129,13 @@ def background_queue_worker():
                             is_batch_mode=False
                         )
                         
+                        debug.queue(f"Processing complete", {
+                            'video': video_path.name,
+                            'success': result.success,
+                            'segments_muted': result.segments_muted,
+                            'error': result.error_message
+                        })
+                        
                         proc.file_manager.mark_as_processed(
                             video_path=video_path,
                             success=result.success,
@@ -126,6 +147,7 @@ def background_queue_worker():
             
         except Exception as e:
             print(f"❌ Queue worker error: {e}")
+            debug.queue(f"Worker error", {'error': str(e)})
             import traceback
             traceback.print_exc()
             # Clear current job on error to prevent stuck queue
@@ -212,7 +234,72 @@ def api_status():
         # Add additional info
         status['timestamp'] = datetime.now().isoformat()
         
+        # Add debug status
+        from cleanvid.services.debug_logger import debug
+        status['debug_enabled'] = debug.enabled
+        
         return jsonify(status)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/debug/toggle', methods=['POST'])
+def api_debug_toggle():
+    """Toggle debug logging on/off."""
+    try:
+        from cleanvid.services.debug_logger import debug
+        
+        # Initialize config path if not set
+        proc = get_processor()
+        debug.set_config_path(proc.settings.paths.config_dir)
+        
+        new_state = debug.toggle()
+        return jsonify({
+            'success': True,
+            'enabled': new_state,
+            'message': f"Debug logging {'enabled' if new_state else 'disabled'}"
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/debug/status')
+def api_debug_status():
+    """Get debug logging status."""
+    try:
+        from cleanvid.services.debug_logger import debug
+        return jsonify({
+            'enabled': debug.enabled
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/debug/logs')
+def api_debug_logs():
+    """Get debug log entries."""
+    try:
+        from cleanvid.services.debug_logger import debug
+        limit = request.args.get('limit', 100, type=int)
+        category = request.args.get('category', None)
+        
+        logs = debug.get_logs(limit=limit, category=category)
+        return jsonify({
+            'logs': logs,
+            'count': len(logs),
+            'enabled': debug.enabled
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/debug/clear', methods=['POST'])
+def api_debug_clear():
+    """Clear debug logs."""
+    try:
+        from cleanvid.services.debug_logger import debug
+        debug.clear_logs()
+        return jsonify({'success': True, 'message': 'Debug logs cleared'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

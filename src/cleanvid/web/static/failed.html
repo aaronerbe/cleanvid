@@ -494,7 +494,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert('✅ Video bypassed successfully!');
+                    showToast('✅ Video bypassed');
                     loadFailedVideos();
                 } else {
                     alert('❌ Error: ' + (data.error || 'Bypass failed'));
@@ -525,7 +525,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert('✅ Video added to processing queue!');
+                    showToast('✅ Added to queue');
                     loadFailedVideos();
                 } else {
                     alert('❌ Error: ' + (data.error || 'Failed to add to queue'));
@@ -548,10 +548,10 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert('✅ Video reset successfully!');
+                    showToast('✅ Video reset');
                     loadFailedVideos();
                 } else {
-                    alert('ℹ️ ' + data.message);
+                    showToast('ℹ️ ' + data.message);
                 }
             } catch (error) {
                 alert('❌ Error: ' + error.message);
@@ -580,7 +580,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert(`✅ ${data.queued} video(s) added to bypass queue!`);
+                    showToast(`✅ ${data.queued} video(s) added to bypass queue`);
                     loadFailedVideos();
                 } else {
                     alert('❌ Error: ' + (data.error || 'Bypass failed'));
@@ -634,7 +634,7 @@
                     }
                 }
 
-                alert(`✅ Reset ${resetCount} video(s)\n✅ Added ${queuedCount} video(s) to processing queue!`);
+                alert(`✅ Reset ${resetCount}, queued ${queuedCount} video(s)`);
                 loadFailedVideos();
             } catch (error) {
                 alert('❌ Error: ' + error.message);
@@ -674,9 +674,9 @@
                 }
 
                 if (failCount === 0) {
-                    alert(`✅ Reset ${successCount} video(s) successfully!`);
+                    showToast(`✅ Reset ${successCount} video(s)`);
                 } else {
-                    alert(`✅ Reset ${successCount} video(s)\n❌ Failed to reset ${failCount} video(s)`);
+                    showToast(`Reset ${successCount}, failed ${failCount}`);
                 }
                 
                 loadFailedVideos();
@@ -698,7 +698,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert(`✅ Reset ${data.count} failed video(s)!`);
+                    showToast(`✅ Reset ${data.count} failed video(s)`);
                     loadFailedVideos();
                 } else {
                     alert('❌ Error resetting videos');
@@ -706,6 +706,18 @@
             } catch (error) {
                 alert('❌ Error: ' + error.message);
             }
+        }
+        
+        // Toast notification helper
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
         }
     </script>
 </body>

@@ -220,7 +220,7 @@
                     await fetch(`/api/queue/${i}`, { method: 'DELETE' });
                 }
 
-                alert('✅ Queue cleared!');
+                showToast('✅ Queue cleared');
                 refreshQueue();
             } catch (error) {
                 alert('❌ Error clearing queue: ' + error.message);
@@ -228,57 +228,46 @@
         }
 
         async function abortCurrent() {
-            if (!confirm('⛔ Stop processing NOW?\n\nThis will:\n1. Kill the current FFmpeg process\n2. Remove incomplete output\n3. Stop the queue\n\nThe video will NOT be marked as processed.')) return;
+            if (!confirm('Stop processing NOW?\n\nThis will kill the current FFmpeg process and stop the queue.')) return;
 
             try {
                 const response = await fetch('/api/queue/abort', { method: 'POST' });
                 const data = await response.json();
 
                 if (data.success) {
-                    alert('✅ ' + data.message);
                     updateQueueWorkerStatus();
                     refreshQueue();
                 } else {
-                    alert('❌ ' + (data.error || 'Abort failed'));
+                    alert('Error: ' + (data.error || 'Abort failed'));
                 }
             } catch (error) {
-                alert('❌ Error: ' + error.message);
+                alert('Error: ' + error.message);
             }
         }
 
         async function pauseQueue() {
-            if (!confirm('⏸️ Pause queue processing?\n\nCurrent video will finish, then processing will pause.')) return;
-
             try {
                 const response = await fetch('/api/queue/stop', { method: 'POST' });
                 const data = await response.json();
-
-                if (data.success) {
-                    alert('✅ ' + data.message);
-                    updateQueueWorkerStatus();
-                } else {
-                    alert('ℹ️ ' + data.message);
+                updateQueueWorkerStatus();
+                if (!data.success) {
+                    alert('Error: ' + data.message);
                 }
             } catch (error) {
-                alert('❌ Error pausing queue: ' + error.message);
+                alert('Error pausing queue: ' + error.message);
             }
         }
 
         async function resumeQueue() {
-            if (!confirm('▶️ Resume queue processing?')) return;
-
             try {
                 const response = await fetch('/api/queue/resume', { method: 'POST' });
                 const data = await response.json();
-
-                if (data.success) {
-                    alert('✅ ' + data.message);
-                    updateQueueWorkerStatus();
-                } else {
-                    alert('ℹ️ ' + data.message);
+                updateQueueWorkerStatus();
+                if (!data.success) {
+                    alert('Error: ' + data.message);
                 }
             } catch (error) {
-                alert('❌ Error resuming queue: ' + error.message);
+                alert('Error resuming queue: ' + error.message);
             }
         }
 
@@ -313,7 +302,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert('✅ ' + data.message);
+                    showToast('✅ ' + data.message);
                     refreshQueue();
                     updateQueueWorkerStatus();
                 } else {
@@ -322,6 +311,18 @@
             } catch (error) {
                 alert('❌ Error: ' + error.message);
             }
+        }
+        
+        // Toast notification helper
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
         }
     </script>
 </body>

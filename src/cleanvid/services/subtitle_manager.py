@@ -13,6 +13,7 @@ from babelfish import Language
 
 from cleanvid.models.subtitle import SubtitleFile, SubtitleEntry
 from cleanvid.models.config import OpenSubtitlesConfig
+from cleanvid.services.debug_logger import debug
 
 
 class SubtitleManager:
@@ -96,7 +97,21 @@ class SubtitleManager:
                 if len(entries) < MIN_SUBTITLE_ENTRIES:
                     print(f"  ⚠️  WARNING: Subtitle file has only {len(entries)} entries (minimum: {MIN_SUBTITLE_ENTRIES})")
                     print(f"  ⚠️  This may be an advertisement or corrupted subtitle file")
+                    debug.subtitle(f"Subtitle rejected - too few entries", {
+                        'path': str(srt_path),
+                        'entry_count': len(entries),
+                        'minimum_required': MIN_SUBTITLE_ENTRIES
+                    })
                     raise ValueError(f"Subtitle file has only {len(entries)} entries - likely invalid or advertisement")
+                
+                debug.subtitle(f"Subtitle parsed successfully", {
+                    'path': str(srt_path),
+                    'encoding': encoding,
+                    'entry_count': len(entries),
+                    'skipped_empty': skipped_empty,
+                    'first_entry_text': entries[0].text[:50] if entries else None,
+                    'last_entry_text': entries[-1].text[:50] if entries else None
+                })
                 
                 return SubtitleFile(
                     path=srt_path,
@@ -155,12 +170,25 @@ class SubtitleManager:
         video_dir = video_path.parent
         video_stem = video_path.stem
         
+        debug.subtitle(f"Searching for subtitle file", {
+            'video': video_path.name,
+            'directory': str(video_dir)
+        })
+        
         # Try common subtitle extensions
         for ext in ['.srt', '.sub', '.ssa', '.ass']:
             subtitle_path = video_dir / f"{video_stem}{ext}"
             if subtitle_path.exists():
+                debug.subtitle(f"Subtitle file found", {
+                    'path': str(subtitle_path),
+                    'extension': ext
+                })
                 return subtitle_path
         
+        debug.subtitle(f"No subtitle file found locally", {
+            'video': video_path.name,
+            'searched_extensions': ['.srt', '.sub', '.ssa', '.ass']
+        })
         return None
     
     def download_subtitles(
@@ -314,9 +342,14 @@ class SubtitleManager:
         if ext in ['.ass', '.ssa']:
             print(f"  ⚠️  WARNING: .ass/.ssa subtitle format not supported: {subtitle_path.name}")
             print(f"  ⚠️  Please convert to .srt format or provide an .srt file")
+            debug.subtitle(f"Unsupported subtitle format", {
+                'path': str(subtitle_path),
+                'format': ext
+            })
             return None
         
         # Parse and return
+        debug.subtitle(f"Loading subtitle file", {'path': str(subtitle_path)})
         return self.parse_srt(subtitle_path)
     
     def validate_subtitle_file(self, subtitle_path: Path) -> tuple[bool, List[str]]:
