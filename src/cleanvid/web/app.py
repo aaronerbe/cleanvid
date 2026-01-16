@@ -590,6 +590,36 @@ def api_process_folder():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/delete-srt', methods=['POST'])
+def api_delete_srt():
+    """Delete the SRT file for a video so it can be redownloaded."""
+    try:
+        data = request.json
+        video_path = data.get('video_path')
+        
+        if not video_path:
+            return jsonify({'error': 'video_path required'}), 400
+        
+        video_path = Path(video_path)
+        
+        # Find and delete SRT file(s) with same base name
+        deleted = []
+        for ext in ['.srt', '.sub', '.ssa', '.ass']:
+            srt_path = video_path.with_suffix(ext)
+            if srt_path.exists():
+                srt_path.unlink()
+                deleted.append(srt_path.name)
+        
+        return jsonify({
+            'success': True,
+            'deleted': deleted,
+            'message': f'Deleted: {deleted}' if deleted else 'No subtitle files found'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/reset', methods=['POST'])
 def api_reset():
     """Reset a video's processing status."""

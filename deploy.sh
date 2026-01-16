@@ -23,6 +23,10 @@ docker build -t cleanvid:2.0 .
 echo -e "${CYAN}==>${NC} Syncing source code into container..."
 docker cp /volume1/docker/cleanvid2/src/cleanvid/. cleanvid2:/app/src/cleanvid/
 
+# Fix ownership inside container after docker cp (docker cp creates root-owned files)
+echo -e "${CYAN}==>${NC} Fixing container file ownership..."
+docker exec -u 0 cleanvid2 chown -R 1026:100 /app/src/cleanvid/
+
 # Restart
 echo -e "${CYAN}==>${NC} Restarting container..."
 docker-compose restart

@@ -323,6 +323,11 @@
                                         title="Reset and add to processing queue">
                                     🔄 Retry
                                 </button>
+                                <button onclick="retryWithNewSrt('${escapedPath}')" 
+                                        class="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm whitespace-nowrap"
+                                        title="Delete SRT and retry with fresh subtitles">
+                                    📥 Retry + New SRT
+                                </button>
                                 <button onclick="resetVideo('${escapedPath}')" 
                                         class="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm whitespace-nowrap"
                                         title="Remove from failed list">
@@ -526,6 +531,44 @@
 
                 if (data.success) {
                     showToast('✅ Added to queue');
+                    loadFailedVideos();
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Failed to add to queue'));
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+        
+        async function retryWithNewSrt(videoPath) {
+            if (!confirm(`Retry with NEW subtitles:\n${getVideoName(videoPath)}?\n\nThis will DELETE the existing SRT and download a fresh one from OpenSubtitles.`)) return;
+
+            try {
+                // Delete SRT first
+                await fetch('/api/delete-srt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                // Reset
+                await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+
+                // Add to queue
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('✅ SRT deleted, added to queue');
                     loadFailedVideos();
                 } else {
                     alert('❌ Error: ' + (data.error || 'Failed to add to queue'));
