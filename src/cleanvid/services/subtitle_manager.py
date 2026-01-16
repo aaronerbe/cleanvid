@@ -225,26 +225,27 @@ class SubtitleManager:
         if language is None:
             language = self.config.language
         
-        debug.subtitle(f"Attempting subtitle download", {
-            'video': video_path.name,
-            'language': language,
-            'provider': 'opensubtitles'
+        debug.subtitle(f"Starting subtitle download", {
+            'video_file': video_path.name,
+            'language': language
         })
         
         try:
             # Create Video object for subliminal
             video = Video.fromname(str(video_path))
-            debug.subtitle(f"Video parsed for search", {
-                'title': getattr(video, 'title', 'unknown'),
-                'year': getattr(video, 'year', 'unknown'),
-                'source': getattr(video, 'source', 'unknown')
+            parsed_title = getattr(video, 'title', 'unknown')
+            parsed_year = getattr(video, 'year', 'unknown')
+            
+            debug.subtitle(f"SEARCH QUERY sent to OpenSubtitles", {
+                'parsed_title': parsed_title,
+                'parsed_year': parsed_year,
+                'note': 'If no results, try renaming file to match this title format'
             })
             
             # Set language
             languages = {Language(language)}
             
             # Download best subtitles
-            debug.subtitle(f"Searching OpenSubtitles...")
             subtitles = download_best_subtitles(
                 {video},
                 languages,
@@ -252,20 +253,21 @@ class SubtitleManager:
             )
             
             if not subtitles or video not in subtitles or not subtitles[video]:
-                debug.subtitle(f"No subtitles found on OpenSubtitles", {
-                    'video': video_path.name,
+                debug.subtitle(f"SEARCH FAILED - No matching subtitles found", {
+                    'searched_for': f"{parsed_title} ({parsed_year})",
                     'language': language,
-                    'result': 'empty'
+                    'action_needed': 'Rename video file to match the correct movie title, or manually download SRT from opensubtitles.org'
                 })
                 print(f"  ⚠️  No subtitles found on OpenSubtitles for: {video_path.name}")
+                print(f"      Searched for: {parsed_title} ({parsed_year})")
                 return None
             
             # Log what we found
             found_subs = list(subtitles[video])
-            debug.subtitle(f"Subtitles found", {
-                'count': len(found_subs),
-                'first_match': {
-                    'id': getattr(found_subs[0], 'id', 'unknown'),
+            debug.subtitle(f"SEARCH SUCCESS - Subtitles found", {
+                'searched_for': f"{parsed_title} ({parsed_year})",
+                'results_count': len(found_subs),
+                'selected_subtitle': {
                     'provider': getattr(found_subs[0], 'provider_name', 'unknown'),
                     'language': str(getattr(found_subs[0], 'language', 'unknown')),
                     'hearing_impaired': getattr(found_subs[0], 'hearing_impaired', False)
