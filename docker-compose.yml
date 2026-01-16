@@ -6,6 +6,9 @@ services:
     image: cleanvid:2.0
     container_name: cleanvid2
     
+    # Run as your NAS user to avoid permission issues
+    user: "1026:100"
+    
     volumes:
       # Mount your video directories
       - /volume1/Videos:/input:ro                    # Read-only input
