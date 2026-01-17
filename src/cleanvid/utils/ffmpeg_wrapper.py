@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 
+from cleanvid.services.debug_logger import debug
+
 
 @dataclass
 class FFprobeResult:
@@ -254,12 +256,28 @@ class FFmpegWrapper:
             
             if process.returncode != 0:
                 stderr_text = stderr.decode('utf-8', errors='replace') if stderr else 'Unknown error'
+                # Log full error to debug system
+                debug.ffmpeg(f"FFmpeg FAILED (mute_audio)", {
+                    'return_code': process.returncode,
+                    'input': str(input_path),
+                    'output': str(output_path),
+                    'error_tail': stderr_text[-1000:],  # Last 1000 chars of error
+                    'command': ' '.join(cmd)
+                })
                 print(f"  FFmpeg error: {stderr_text[-500:]}")
                 return False
             
+            debug.ffmpeg(f"FFmpeg SUCCESS (mute_audio)", {
+                'input': input_path.name,
+                'output': output_path.name
+            })
             return True
         
         except Exception as e:
+            debug.ffmpeg(f"FFmpeg EXCEPTION (mute_audio)", {
+                'exception': str(e),
+                'input': str(input_path)
+            })
             print(f"  FFmpeg exception: {e}")
             return False
     

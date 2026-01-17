@@ -722,13 +722,29 @@ class VideoProcessor:
             
             if process.returncode != 0:
                 stderr_text = stderr.decode('utf-8', errors='replace') if stderr else 'Unknown error'
+                # Log full error to debug system
+                debug.ffmpeg(f"FFmpeg FAILED (scene_filters)", {
+                    'return_code': process.returncode,
+                    'input': str(input_path),
+                    'output': str(output_path),
+                    'error_tail': stderr_text[-1000:],  # Last 1000 chars of error
+                    'command': ' '.join(cmd)
+                })
                 print(f"  FFmpeg error: {stderr_text[-500:]}")
                 return False
             
+            debug.ffmpeg(f"FFmpeg SUCCESS (scene_filters)", {
+                'input': input_path.name,
+                'output': output_path.name
+            })
             print(f"  ✓ Video processed with scene filters")
             return True
         
         except Exception as e:
+            debug.ffmpeg(f"FFmpeg EXCEPTION (scene_filters)", {
+                'exception': str(e),
+                'input': str(input_path)
+            })
             print(f"  Error processing with scene filters: {e}")
             return False
     
