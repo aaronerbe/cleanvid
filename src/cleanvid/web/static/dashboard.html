@@ -777,6 +777,9 @@
                     <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                         <p class="font-semibold text-red-700">Error:</p>
                         <p class="text-red-600 text-sm mt-1">${data.error}</p>
+                        <div id="subtitleSearchInfo" class="mt-3 pt-3 border-t border-red-200">
+                            <p class="text-gray-500 text-xs">Loading subtitle search details...</p>
+                        </div>
                     </div>
                 ` : ''}
                 
@@ -797,10 +800,8 @@
                 <div class="mb-4">
                     <h4 class="font-semibold text-gray-700 mb-2">Processing Details</h4>
                     <div class="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-                        <div class="flex justify-between"><span class="text-gray-500">Processing Time:</span><span class="text-gray-700">${data.processing_time_display || 'N/A'}</span></div>
                         <div class="flex justify-between"><span class="text-gray-500">Segments Muted:</span><span class="text-blue-600 font-semibold">${data.segments_muted || 0}</span></div>
                         <div class="flex justify-between"><span class="text-gray-500">Scene Zones:</span><span class="text-purple-600 font-semibold">${data.scene_zones_processed || 0}</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Subtitle Downloaded:</span><span class="text-gray-700">${data.subtitle_downloaded ? 'Yes' : 'No'}</span></div>
                     </div>
                 </div>
                 
@@ -842,33 +843,62 @@
                     </div>
                 ` : ''}
                 
-                <!-- Actions (only for failed videos) -->
-                ${!data.success ? `
-                    <div class="border-t pt-4 mt-4">
-                        <h4 class="font-semibold text-gray-700 mb-3">Actions</h4>
-                        <div class="flex flex-wrap gap-2">
-                            <button onclick="modalRetry()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                                🔄 Retry
-                            </button>
-                            <button onclick="modalRetryNewSrt()" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
-                                📥 Retry + New SRT
-                            </button>
-                            <button onclick="modalBypass()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                                ➡️ Bypass
-                            </button>
-                            <button onclick="modalReset()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">
-                                ↩️ Reset
-                            </button>
-                        </div>
+                <!-- Actions -->
+                <div class="border-t pt-4 mt-4">
+                    <h4 class="font-semibold text-gray-700 mb-3">Actions</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="modalRetry()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                            🔄 Retry
+                        </button>
+                        <button onclick="modalRetryNewSrt()" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+                            📥 Retry + New SRT
+                        </button>
+                        <button onclick="modalBypass()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                            ➡️ Bypass
+                        </button>
+                        <button onclick="modalReset()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">
+                            ↩️ Reset
+                        </button>
                     </div>
-                ` : `
-                    <div class="border-t pt-4 mt-4">
-                        <p class="text-green-600 text-sm">✅ This video was processed successfully. No actions needed.</p>
-                    </div>
-                `}
+                </div>
             `;
             
             document.getElementById('modalContent').innerHTML = html;
+            
+            // If there's an error, load subtitle search info
+            if (data.error && data.error.includes('subtitle')) {
+                loadSubtitleSearchInfo(data.video_name);
+            }
+        }
+        
+        async function loadSubtitleSearchInfo(videoName) {
+            const container = document.getElementById('subtitleSearchInfo');
+            if (!container) return;
+            
+            try {
+                const response = await fetch(`/api/debug/subtitle-search?video=${encodeURIComponent(videoName)}`);
+                const data = await response.json();
+                
+                let html = '';
+                
+                if (data.search_query) {
+                    html += `<p class="text-sm"><strong>OpenSubtitles searched for:</strong></p>`;
+                    html += `<p class="text-sm text-gray-700 ml-2">"${data.search_query.parsed_title}" (${data.search_query.parsed_year || 'no year'})</p>`;
+                    
+                    if (data.search_result === 'failed') {
+                        html += `<p class="text-sm text-red-600 mt-2"><strong>Result:</strong> No matching subtitles found</p>`;
+                        html += `<p class="text-sm text-gray-600 mt-1"><strong>Fix:</strong> Rename the video file to match the correct movie title, or manually download an SRT from opensubtitles.org</p>`;
+                    }
+                } else if (data.error_info) {
+                    html += `<p class="text-sm text-red-600">${data.error_info}</p>`;
+                } else {
+                    html += `<p class="text-xs text-gray-500">No subtitle search logs found. Enable debug logging and retry to see details.</p>`;
+                }
+                
+                container.innerHTML = html;
+            } catch (error) {
+                container.innerHTML = `<p class="text-xs text-gray-500">Could not load search details</p>`;
+            }
         }
         
         async function loadDebugLogsForVideo() {

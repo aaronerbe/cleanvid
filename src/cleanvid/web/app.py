@@ -310,6 +310,61 @@ def api_debug_clear():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/debug/subtitle-search')
+def api_debug_subtitle_search():
+    """Get the last subtitle search attempt for a video from debug logs."""
+    try:
+        from cleanvid.services.debug_logger import debug
+        video_name = request.args.get('video', '')
+        
+        if not video_name:
+            return jsonify({'error': 'video parameter required'}), 400
+        
+        # Get recent subtitle logs
+        all_logs = debug.get_logs(limit=200, category='SUBTITLE')
+        
+        # Find logs related to this video
+        relevant_logs = []
+        for log in all_logs:
+            if log.get('data'):
+                data_str = json.dumps(log['data'])
+                if video_name in data_str:
+                    relevant_logs.append(log)
+        
+        # Extract key info
+        search_query = None
+        search_result = None
+        error_info = None
+        
+        for log in relevant_logs:
+            msg = log.get('message', '')
+            data = log.get('data', {})
+            
+            if 'SEARCH QUERY' in msg:
+                search_query = {
+                    'parsed_title': data.get('parsed_title'),
+                    'parsed_year': data.get('parsed_year')
+                }
+            elif 'SEARCH FAILED' in msg:
+                search_result = 'failed'
+                error_info = data.get('action_needed')
+            elif 'SEARCH SUCCESS' in msg:
+                search_result = 'success'
+            elif 'Download failed' in msg:
+                error_info = data.get('error_message')
+        
+        return jsonify({
+            'video': video_name,
+            'search_query': search_query,
+            'search_result': search_result,
+            'error_info': error_info,
+            'raw_logs': relevant_logs[:10]  # Include up to 10 raw logs
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/history')
 def api_history():
     """Get processing history."""
