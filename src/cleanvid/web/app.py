@@ -140,7 +140,13 @@ def background_queue_worker():
                             video_path=video_path,
                             success=result.success,
                             segments_muted=result.segments_muted,
-                            error=result.error_message
+                            error=result.error_message,
+                            output_path=result.output_path,
+                            processing_time_seconds=result.duration_seconds,
+                            subtitle_downloaded=result.subtitle_downloaded,
+                            scene_zones_processed=result.scene_zones_processed,
+                            words_filtered=result.words_filtered,
+                            warnings=result.warnings
                         )
                         
                         print(f"✅ Completed: {video_path.name}")
@@ -620,10 +626,15 @@ def api_video_details():
         # Enrich with additional info
         video_path_obj = Path(video_path)
         
-        # Check if files exist
+        # Check if input exists
         input_exists = video_path_obj.exists()
-        output_path = entry.get('output_path')
-        output_exists = Path(output_path).exists() if output_path else False
+        
+        # Generate expected output path (same logic as get_unprocessed_videos)
+        expected_output_path = proc.file_manager.generate_output_path(video_path_obj)
+        output_exists = expected_output_path.exists()
+        
+        # Use stored output_path if available, otherwise use generated one
+        output_path = entry.get('output_path') or str(expected_output_path)
         
         # Check for subtitle file
         srt_path = video_path_obj.with_suffix('.srt')
@@ -631,7 +642,7 @@ def api_video_details():
         
         # Get file sizes if available
         input_size_mb = round(video_path_obj.stat().st_size / (1024*1024), 1) if input_exists else None
-        output_size_mb = round(Path(output_path).stat().st_size / (1024*1024), 1) if output_exists else None
+        output_size_mb = round(expected_output_path.stat().st_size / (1024*1024), 1) if output_exists else None
         
         # Format processing time
         processing_time = entry.get('processing_time_seconds', 0)
