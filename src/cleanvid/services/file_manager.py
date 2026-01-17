@@ -663,26 +663,15 @@ class FileManager:
     
     def ensure_output_directory(self, output_path: Path) -> None:
         """
-        Ensure output directory exists with proper permissions.
+        Ensure output directory exists.
+        
+        Note: Permissions are handled by Docker's PUID/PGID and umask settings.
+        Do NOT call os.chmod() here - it breaks Synology NAS permissions.
         
         Args:
             output_path: Output file path.
         """
-        import os
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Fix directory permissions for NAS access
-        # Walk up and fix all parent directories we may have created
-        current = output_path.parent
-        output_root = self.path_config.output_dir
-        while current != output_root and str(current).startswith(str(output_root)):
-            try:
-                os.chmod(current, 0o755)  # rwxr-xr-x for directories
-            except:
-                pass
-            if current.parent == current:
-                break
-            current = current.parent
     
     def __repr__(self) -> str:
         """Detailed representation."""

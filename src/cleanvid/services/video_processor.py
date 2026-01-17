@@ -278,33 +278,17 @@ class VideoProcessor:
                     )
                 
                 try:
-                    # Ensure output directory exists with proper permissions
+                    # Ensure output directory exists
+                    # Note: Permissions handled by Docker PUID/PGID - do NOT chmod
                     output_path.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    # Fix directory permissions for NAS access
-                    # Walk up and fix all parent directories we may have created
-                    import os
-                    current = output_path.parent
-                    while str(current) != str(Path('/output')):
-                        try:
-                            os.chmod(current, 0o755)  # rwxr-xr-x for directories
-                        except:
-                            pass
-                        if current.parent == current:
-                            break
-                        current = current.parent
                     
                     debug.file(f"Copying video to output", {
                         'source': str(video_path),
                         'dest': str(output_path)
                     })
                     
-                    # Copy file
+                    # Copy file (preserves metadata including permissions from source)
                     shutil.copy2(video_path, output_path)
-                    
-                    # Fix permissions for NAS access (make world-readable/writable)
-                    os.chmod(output_path, 0o666)
-                    debug.file(f"Permissions set to 0o666")
                     
                     # Copy SRT file (no redaction needed since no profanity was detected)
                     self._copy_srt_for_clean_video(video_path, output_path, subtitle_file)
@@ -842,11 +826,8 @@ class VideoProcessor:
             output_srt = output_path.with_suffix('.srt')
             
             # Simply copy the SRT file (no redaction needed since no profanity was detected)
+            # Note: shutil.copy2 preserves permissions - Docker PUID/PGID handles NAS access
             shutil.copy2(srt_path, output_srt)
-            
-            # Fix permissions for NAS access
-            import os
-            os.chmod(output_srt, 0o666)
             
             print(f"  ✓ SRT copied: {output_srt.name}")
         
