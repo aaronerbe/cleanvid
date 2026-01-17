@@ -239,6 +239,8 @@ class FileManager:
         """
         Mark a video as processed.
         
+        Replaces any existing entry for this video (no duplicates).
+        
         Args:
             video_path: Path to video file.
             success: Whether processing was successful.
@@ -251,9 +253,14 @@ class FileManager:
             output_path: Path to output file.
             warnings: Any warnings generated during processing.
         """
+        video_str = str(video_path)
+        
         # Only add to processed set if successful
         if success:
-            self._processed_files.add(str(video_path))
+            self._processed_files.add(video_str)
+        else:
+            # Remove from processed set if it was there
+            self._processed_files.discard(video_str)
         
         # Load existing log
         log_entries = []
@@ -264,9 +271,12 @@ class FileManager:
             except:
                 log_entries = []
         
+        # Remove any existing entries for this video (prevent duplicates)
+        log_entries = [e for e in log_entries if e.get('video_path') != video_str]
+        
         # Add new entry with all available details
         entry = {
-            'video_path': str(video_path),
+            'video_path': video_str,
             'timestamp': datetime.now().isoformat(),
             'success': success,
             'segments_muted': segments_muted,

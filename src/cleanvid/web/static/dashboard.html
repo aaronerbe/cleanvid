@@ -669,8 +669,6 @@
         }
         
         async function resetVideo(videoPath) {
-            if (!confirm(`Reset ${videoPath.split('/').pop()}?`)) return;
-            
             try {
                 const response = await fetch('/api/reset', {
                     method: 'POST',
@@ -681,20 +679,19 @@
                 const data = await response.json();
                 
                 if (data.success) {
+                    showToast(`↩️ ${videoPath.split('/').pop()} reset`);
                     refreshFailures();
                     refreshStatus();
                     refreshHistory();
                 } else {
-                    alert('Error: ' + (data.message || 'Reset failed'));
+                    showToast(`❌ Reset failed: ${data.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                showToast(`❌ Error: ${error.message}`, 'error');
             }
         }
 
         async function retryVideo(videoPath) {
-            if (!confirm(`Retry ${videoPath.split('/').pop()}?`)) return;
-            
             try {
                 await fetch('/api/reset', {
                     method: 'POST',
@@ -711,20 +708,19 @@
                 const data = await response.json();
                 
                 if (data.success) {
+                    showToast(`🔄 ${videoPath.split('/').pop()} added to queue`);
                     refreshHistory();
                     refreshFailures();
                     updateQueueCount();
                 } else {
-                    alert('Error: ' + (data.error || 'Retry failed'));
+                    showToast(`❌ Retry failed: ${data.error || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                showToast(`❌ Error: ${error.message}`, 'error');
             }
         }
 
         async function bypassVideo(videoPath) {
-            if (!confirm(`Bypass ${videoPath.split('/').pop()}?`)) return;
-            
             try {
                 const response = await fetch('/api/bypass', {
                     method: 'POST',
@@ -735,14 +731,15 @@
                 const data = await response.json();
                 
                 if (data.success) {
+                    showToast(`➡️ ${videoPath.split('/').pop()} bypassed`);
                     refreshFailures();
                     refreshStatus();
                     refreshHistory();
                 } else {
-                    alert('Error: ' + (data.message || 'Bypass failed'));
+                    showToast(`❌ Bypass failed: ${data.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                showToast(`❌ Error: ${error.message}`, 'error');
             }
         }
 
@@ -781,8 +778,6 @@
                 .map(line => line.trim())
                 .filter(line => line && !line.startsWith('#'));
             
-            if (!confirm(`Save ${words.length} words?`)) return;
-            
             try {
                 const response = await fetch('/api/wordlist', {
                     method: 'POST',
@@ -797,10 +792,10 @@
                     closeWordListModal();
                     refreshStatus();
                 } else {
-                    alert('Error: ' + (data.message || 'Save failed'));
+                    showToast(`❌ Save failed: ${data.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                showToast(`❌ Error: ${error.message}`, 'error');
             }
         }
         
@@ -1080,37 +1075,133 @@
         
         async function modalRetry() {
             if (!currentVideoPath) return;
+            const videoPath = currentVideoPath;
             closeVideoModal();
-            await retryVideo(currentVideoPath);
+            
+            try {
+                // Reset first
+                await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                // Add to queue
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(`🔄 ${videoPath.split('/').pop()} added to queue`);
+                    refreshHistory();
+                    refreshFailures();
+                    updateQueueCount();
+                } else {
+                    showToast(`❌ Retry failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showToast(`❌ Error: ${error.message}`, 'error');
+            }
         }
         
         async function modalRetryNewSrt() {
             if (!currentVideoPath) return;
-            if (!confirm('Delete existing SRT and retry with fresh subtitles?')) return;
+            const videoPath = currentVideoPath;
             closeVideoModal();
             
             try {
+                // Delete existing SRT
                 await fetch('/api/delete-srt', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_path: currentVideoPath })
+                    body: JSON.stringify({ video_path: videoPath })
                 });
-                await retryVideo(currentVideoPath);
+                
+                // Reset
+                await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                // Add to queue
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(`📥 ${videoPath.split('/').pop()} added to queue (new SRT)`);
+                    refreshHistory();
+                    refreshFailures();
+                    updateQueueCount();
+                } else {
+                    showToast(`❌ Retry failed: ${data.error || 'Unknown error'}`, 'error');
+                }
             } catch (error) {
-                alert('Error: ' + error.message);
+                showToast(`❌ Error: ${error.message}`, 'error');
             }
         }
         
         async function modalBypass() {
             if (!currentVideoPath) return;
+            const videoPath = currentVideoPath;
             closeVideoModal();
-            await bypassVideo(currentVideoPath);
+            
+            try {
+                const response = await fetch('/api/bypass', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(`➡️ ${videoPath.split('/').pop()} bypassed`);
+                    refreshFailures();
+                    refreshStatus();
+                    refreshHistory();
+                } else {
+                    showToast(`❌ Bypass failed: ${data.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showToast(`❌ Error: ${error.message}`, 'error');
+            }
         }
         
         async function modalReset() {
             if (!currentVideoPath) return;
+            const videoPath = currentVideoPath;
             closeVideoModal();
-            await resetVideo(currentVideoPath);
+            
+            try {
+                const response = await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(`↩️ ${videoPath.split('/').pop()} reset`);
+                    refreshFailures();
+                    refreshStatus();
+                    refreshHistory();
+                } else {
+                    showToast(`❌ Reset failed: ${data.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showToast(`❌ Error: ${error.message}`, 'error');
+            }
         }
         
         // Close modal on backdrop click
@@ -1124,9 +1215,10 @@
         });
         
         // Toast notification helper
-        function showToast(message) {
+        function showToast(message, type = 'success') {
             const toast = document.createElement('div');
-            toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+            const bgColor = type === 'error' ? 'bg-red-600' : 'bg-green-600';
+            toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300`;
             toast.textContent = message;
             document.body.appendChild(toast);
             setTimeout(() => {
