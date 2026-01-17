@@ -21,6 +21,8 @@
         .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
         .modal.show { display: block; }
         .modal-content { background-color: #fefefe; margin: 5% auto; padding: 0; border-radius: 8px; width: 90%; max-width: 800px; max-height: 80vh; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .filter-btn { transition: all 0.2s; }
+        .filter-btn.active { ring: 2px; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -146,17 +148,17 @@
             </div>
         </section>
 
-        <!-- Processing Statistics - Collapsible -->
+        <!-- Processing Statistics - Collapsible (Default Open) -->
         <section class="mb-8">
             <div class="collapse-header flex items-center justify-between p-2 rounded" onclick="toggleSection('statsSection')">
                 <h2 class="text-2xl font-bold flex items-center gap-2">
                     Processing Statistics
-                    <svg id="statsIcon" class="collapse-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg id="statsIcon" class="collapse-icon open w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                     </svg>
                 </h2>
             </div>
-            <div id="statsSection" class="collapsible-content">
+            <div id="statsSection" class="collapsible-content open">
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
                     <div class="bg-white rounded-lg shadow-md p-6">
                         <p class="text-gray-500 text-sm">Total Videos</p>
@@ -188,7 +190,7 @@
         <!-- Actions Section -->
         <section class="mb-8">
             <h2 class="text-2xl font-bold mb-4">Actions</h2>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Browse & Process -->
                 <a href="/browse.html" class="action-card bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-md p-6 cursor-pointer block">
                     <div class="flex flex-col items-center text-center">
@@ -199,17 +201,6 @@
                         <p class="text-blue-100 text-sm mt-1">Select videos or folders</p>
                     </div>
                 </a>
-
-                <!-- Process All -->
-                <div onclick="processAll()" class="action-card bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-md p-6 cursor-pointer">
-                    <div class="flex flex-col items-center text-center">
-                        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                        <p class="font-bold text-lg">Process All</p>
-                        <p class="text-green-100 text-sm mt-1">Queue all unprocessed</p>
-                    </div>
-                </div>
 
                 <!-- Scene Editor -->
                 <a href="/scene_editor.html" class="action-card bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-md p-6 cursor-pointer block">
@@ -235,43 +226,87 @@
             </div>
         </section>
 
-        <!-- Recent Activity & Failures -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <!-- Recent Activity -->
-            <section>
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold">Recent Activity</h2>
-                    <button onclick="refreshHistory()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                        Refresh
-                    </button>
-                </div>
-                <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                    <div id="recentActivity" class="divide-y max-h-96 overflow-y-auto">
-                        <!-- Will be populated by JavaScript -->
+        <!-- Recent Activity (Full Width with Pagination and Filters) -->
+        <section class="mb-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Recent Activity</h2>
+                <button onclick="refreshHistory()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                    Refresh
+                </button>
+            </div>
+            
+            <!-- Filters -->
+            <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+                <div class="flex flex-wrap items-center gap-4">
+                    <!-- Search Input -->
+                    <div class="flex-1 min-w-[200px]">
+                        <input 
+                            type="text" 
+                            id="historySearch" 
+                            placeholder="Search video names..." 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            oninput="filterHistory()"
+                        >
                     </div>
-                </div>
-            </section>
-
-            <!-- Failed Videos -->
-            <section>
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold">Failed Videos</h2>
+                    
+                    <!-- Status Filters -->
                     <div class="flex gap-2">
-                        <a href="/failed.html" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
-                            📋 View All
-                        </a>
-                        <button onclick="refreshFailures()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                            Refresh
+                        <button 
+                            id="filterSucceeded" 
+                            onclick="toggleFilter('succeeded')" 
+                            class="filter-btn px-3 py-2 rounded-lg border-2 border-green-500 text-green-600 hover:bg-green-50 active"
+                        >
+                            ✓ Succeeded
+                        </button>
+                        <button 
+                            id="filterFailed" 
+                            onclick="toggleFilter('failed')" 
+                            class="filter-btn px-3 py-2 rounded-lg border-2 border-red-500 text-red-600 hover:bg-red-50 active"
+                        >
+                            ✗ Failed
+                        </button>
+                        <button 
+                            id="filterBypassed" 
+                            onclick="toggleFilter('bypassed')" 
+                            class="filter-btn px-3 py-2 rounded-lg border-2 border-gray-500 text-gray-600 hover:bg-gray-50 active"
+                        >
+                            ➡ Bypassed
                         </button>
                     </div>
                 </div>
-                <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                    <div id="failedVideosList" class="divide-y max-h-96 overflow-y-auto">
-                        <!-- Will be populated by JavaScript -->
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <div id="recentActivity" class="divide-y">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+                
+                <!-- Pagination Controls -->
+                <div id="paginationControls" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
+                    <div class="text-sm text-gray-600">
+                        Showing <span id="showingStart">0</span>-<span id="showingEnd">0</span> of <span id="totalItems">0</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button 
+                            id="prevPageBtn" 
+                            onclick="changePage(-1)" 
+                            class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled
+                        >
+                            ← Previous
+                        </button>
+                        <span class="px-3 py-1 text-gray-600">Page <span id="currentPage">1</span></span>
+                        <button 
+                            id="nextPageBtn" 
+                            onclick="changePage(1)" 
+                            class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Next →
+                        </button>
                     </div>
                 </div>
-            </section>
-        </div>
+            </div>
+        </section>
 
     </main>
 
@@ -331,6 +366,13 @@
     </div>
 
     <script>
+        // Pagination and filter state
+        let allHistoryData = [];
+        let filteredHistoryData = [];
+        let currentPageNum = 1;
+        const itemsPerPage = 15;
+        let activeFilters = { succeeded: true, failed: true, bypassed: true };
+        
         // Auto-refresh every 10 seconds
         setInterval(() => {
             refreshStatus();
@@ -354,6 +396,128 @@
             
             section.classList.toggle('open');
             icon.classList.toggle('open');
+        }
+        
+        // Filter toggle
+        function toggleFilter(filterName) {
+            activeFilters[filterName] = !activeFilters[filterName];
+            const btn = document.getElementById(`filter${filterName.charAt(0).toUpperCase() + filterName.slice(1)}`);
+            
+            if (activeFilters[filterName]) {
+                btn.classList.add('active');
+                btn.style.backgroundColor = '';
+            } else {
+                btn.classList.remove('active');
+                btn.style.backgroundColor = '#f3f4f6';
+            }
+            
+            filterHistory();
+        }
+        
+        // Apply filters and search
+        function filterHistory() {
+            const searchTerm = document.getElementById('historySearch').value.toLowerCase();
+            
+            filteredHistoryData = allHistoryData.filter(entry => {
+                // Check search term
+                const videoName = entry.video_path.split('/').pop().toLowerCase();
+                if (searchTerm && !videoName.includes(searchTerm)) {
+                    return false;
+                }
+                
+                // Check status filters
+                const isBypassed = entry.bypassed === true;
+                const isSucceeded = entry.success && !isBypassed;
+                const isFailed = !entry.success;
+                
+                if (isBypassed && !activeFilters.bypassed) return false;
+                if (isSucceeded && !activeFilters.succeeded) return false;
+                if (isFailed && !activeFilters.failed) return false;
+                
+                return true;
+            });
+            
+            currentPageNum = 1;
+            renderHistoryPage();
+        }
+        
+        // Change page
+        function changePage(delta) {
+            const maxPage = Math.ceil(filteredHistoryData.length / itemsPerPage);
+            currentPageNum = Math.max(1, Math.min(currentPageNum + delta, maxPage));
+            renderHistoryPage();
+        }
+        
+        // Render current page
+        function renderHistoryPage() {
+            const container = document.getElementById('recentActivity');
+            const startIdx = (currentPageNum - 1) * itemsPerPage;
+            const endIdx = Math.min(startIdx + itemsPerPage, filteredHistoryData.length);
+            const pageData = filteredHistoryData.slice(startIdx, endIdx);
+            
+            container.innerHTML = '';
+            
+            if (pageData.length === 0) {
+                container.innerHTML = '<p class="p-4 text-gray-500">No matching history found</p>';
+            } else {
+                pageData.forEach(entry => {
+                    const div = document.createElement('div');
+                    div.className = 'p-4 hover:bg-gray-50 cursor-pointer transition';
+                    div.onclick = () => showVideoDetails(entry.video_path);
+                    
+                    const isBypassed = entry.bypassed === true;
+                    const success = entry.success;
+                    
+                    let statusClass, statusIcon, statusLabel;
+                    if (isBypassed) {
+                        statusClass = 'text-gray-600';
+                        statusIcon = '➡';
+                        statusLabel = 'Bypassed';
+                    } else if (success) {
+                        statusClass = 'text-green-600';
+                        statusIcon = '✓';
+                        statusLabel = 'Success';
+                    } else {
+                        statusClass = 'text-red-600';
+                        statusIcon = '✗';
+                        statusLabel = 'Failed';
+                    }
+                    
+                    const videoName = entry.video_path.split('/').pop();
+                    const timestamp = new Date(entry.timestamp).toLocaleString();
+                    
+                    div.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="${statusClass} font-bold">${statusIcon}</span>
+                                    <span class="font-medium">${videoName}</span>
+                                    <span class="text-xs px-2 py-0.5 rounded ${isBypassed ? 'bg-gray-100 text-gray-600' : (success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}">${statusLabel}</span>
+                                </div>
+                                <div class="text-sm text-gray-500 mt-1">${timestamp}</div>
+                                ${entry.segments_muted ? `<div class="text-sm text-blue-600 mt-1">Segments muted: ${entry.segments_muted}</div>` : (entry.success && !entry.error && !isBypassed ? `<div class="text-sm text-green-600 mt-1">✓ Clean (no profanity detected)</div>` : '')}
+                                ${entry.scene_zones_processed ? `<div class="text-sm text-purple-600 mt-1">Scene zones: ${entry.scene_zones_processed}</div>` : ''}
+                                ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error.substring(0, 100)}${entry.error.length > 100 ? '...' : ''}</div>` : ''}
+                            </div>
+                            <span class="text-gray-400 text-sm">➤</span>
+                        </div>
+                    `;
+                    
+                    container.appendChild(div);
+                });
+            }
+            
+            // Update pagination info
+            const total = filteredHistoryData.length;
+            const maxPage = Math.max(1, Math.ceil(total / itemsPerPage));
+            
+            document.getElementById('showingStart').textContent = total > 0 ? startIdx + 1 : 0;
+            document.getElementById('showingEnd').textContent = endIdx;
+            document.getElementById('totalItems').textContent = total;
+            document.getElementById('currentPage').textContent = currentPageNum;
+            
+            document.getElementById('prevPageBtn').disabled = currentPageNum <= 1;
+            document.getElementById('nextPageBtn').disabled = currentPageNum >= maxPage;
         }
         
         async function updateQueueCount() {
@@ -399,7 +563,6 @@
                 }
                 
                 // Calculate % complete based on unprocessed count
-                // This is more accurate: (total - unprocessed) / total
                 const percentComplete = total > 0 ? Math.round(((total - unprocessed) / total) * 100) : 0;
                 document.getElementById('percentComplete').textContent = percentComplete + '%';
                 
@@ -429,47 +592,13 @@
 
         async function refreshHistory() {
             try {
-                const response = await fetch('/api/history?limit=15');
+                // Fetch all history (large limit for pagination)
+                const response = await fetch('/api/history?limit=1000');
                 const data = await response.json();
                 
-                const container = document.getElementById('recentActivity');
-                container.innerHTML = '';
+                allHistoryData = data.history || [];
+                filterHistory(); // This will also render
                 
-                if (data.history.length === 0) {
-                    container.innerHTML = '<p class="p-4 text-gray-500">No processing history yet</p>';
-                    return;
-                }
-                
-                data.history.forEach(entry => {
-                    const div = document.createElement('div');
-                    div.className = 'p-4 hover:bg-gray-50 cursor-pointer transition';
-                    div.onclick = () => showVideoDetails(entry.video_path);
-                    
-                    const success = entry.success;
-                    const statusClass = success ? 'text-green-600' : 'text-red-600';
-                    const statusIcon = success ? '✓' : '✗';
-                    
-                    const videoName = entry.video_path.split('/').pop();
-                    const timestamp = new Date(entry.timestamp).toLocaleString();
-                    
-                    div.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="${statusClass} font-bold">${statusIcon}</span>
-                                    <span class="font-medium">${videoName}</span>
-                                </div>
-                                <div class="text-sm text-gray-500 mt-1">${timestamp}</div>
-                                ${entry.segments_muted ? `<div class="text-sm text-blue-600 mt-1">Segments muted: ${entry.segments_muted}</div>` : (entry.success && !entry.error ? `<div class="text-sm text-green-600 mt-1">✓ Clean (no profanity detected)</div>` : '')}
-                                ${entry.scene_zones_processed ? `<div class="text-sm text-purple-600 mt-1">Scene zones: ${entry.scene_zones_processed}</div>` : ''}
-                                ${entry.error ? `<div class="text-sm text-red-600 mt-1">${entry.error.substring(0, 100)}${entry.error.length > 100 ? '...' : ''}</div>` : ''}
-                            </div>
-                            <span class="text-gray-400 text-sm">➤</span>
-                        </div>
-                    `;
-                    
-                    container.appendChild(div);
-                });
             } catch (error) {
                 console.error('Error fetching history:', error);
             }
@@ -482,50 +611,6 @@
                 
                 // Update failed count in stats
                 document.getElementById('failedVideos').textContent = data.total || 0;
-                
-                const listContainer = document.getElementById('failedVideosList');
-                
-                listContainer.innerHTML = '';
-                
-                if (data.failures.length === 0) {
-                    listContainer.innerHTML = '<p class="p-4 text-gray-500">No failures! 🎉</p>';
-                    return;
-                }
-                
-                data.failures.slice(0, 10).forEach(entry => {
-                    const div = document.createElement('div');
-                    div.className = 'p-4 hover:bg-gray-50 cursor-pointer transition';
-                    div.onclick = (e) => {
-                        // Don't open modal if clicking a button
-                        if (e.target.tagName === 'BUTTON') return;
-                        showVideoDetails(entry.video_path);
-                    };
-                    
-                    const videoName = entry.video_path.split('/').pop();
-                    const error = entry.error || 'Unknown error';
-                    const escapedPath = entry.video_path.replace(/'/g, "\\'");
-                    
-                    const pathParts = entry.video_path.split('/');
-                    const relevantPath = pathParts.slice(-3).join('/');
-                    
-                    div.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div class="flex-1">
-                                <div class="font-medium text-red-600">${videoName}</div>
-                                <div class="text-xs text-gray-500 mt-1">${relevantPath}</div>
-                                <div class="text-sm text-gray-600 mt-1">${error.substring(0, 80)}${error.length > 80 ? '...' : ''}</div>
-                                <div class="mt-2 flex gap-2">
-                                    <button onclick="bypassVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700">Bypass</button>
-                                    <button onclick="resetVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-orange-500 text-white rounded hover:bg-orange-600">Reset</button>
-                                    <button onclick="retryVideo('${escapedPath}')" class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Retry</button>
-                                </div>
-                            </div>
-                            <span class="text-gray-400 text-sm">➤</span>
-                        </div>
-                    `;
-                    
-                    listContainer.appendChild(div);
-                });
             } catch (error) {
                 console.error('Error fetching failures:', error);
             }
@@ -549,37 +634,6 @@
                 console.error('Error toggling debug mode:', error);
             }
         }
-            
-        async function processAll() {
-            const unprocessedCount = document.getElementById('unprocessedVideos').textContent;
-            
-            if (unprocessedCount === '--' || unprocessedCount === '0') {
-                alert('No unprocessed videos found!');
-                return;
-            }
-            
-            if (!confirm(`Queue ${unprocessedCount} video(s) for processing?`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/process-all', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Silent success - update UI instead of alert
-                    updateQueueCount();
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to add to queue'));
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
-        }
         
         async function resetVideo(videoPath) {
             if (!confirm(`Reset ${videoPath.split('/').pop()}?`)) return;
@@ -594,9 +648,9 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Silent success
                     refreshFailures();
                     refreshStatus();
+                    refreshHistory();
                 } else {
                     alert('Error: ' + (data.message || 'Reset failed'));
                 }
@@ -624,7 +678,6 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Silent success
                     refreshHistory();
                     refreshFailures();
                     updateQueueCount();
@@ -649,9 +702,9 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Silent success
                     refreshFailures();
                     refreshStatus();
+                    refreshHistory();
                 } else {
                     alert('Error: ' + (data.message || 'Bypass failed'));
                 }
@@ -720,6 +773,7 @@
         
         // Video Details Modal
         let currentVideoPath = null;
+        let currentVideoData = null;
         
         async function showVideoDetails(videoPath) {
             currentVideoPath = videoPath;
@@ -735,6 +789,7 @@
             try {
                 const response = await fetch(`/api/video-details?path=${encodeURIComponent(videoPath)}`);
                 const data = await response.json();
+                currentVideoData = data;
                 
                 if (data.error) {
                     document.getElementById('modalContent').innerHTML = `
@@ -758,13 +813,14 @@
         }
         
         function renderVideoDetails(data) {
-            const statusColor = data.success ? 'green' : 'red';
-            const statusText = data.success ? 'Success' : 'Failed';
-            const statusIcon = data.success ? '✓' : '✗';
+            const isBypassed = data.bypassed === true;
+            const statusColor = isBypassed ? 'gray' : (data.success ? 'green' : 'red');
+            const statusText = isBypassed ? 'Bypassed' : (data.success ? 'Success' : 'Failed');
+            const statusIcon = isBypassed ? '➡' : (data.success ? '✓' : '✗');
             
             let html = `
                 <!-- Status Banner -->
-                <div class="mb-4 p-3 rounded-lg ${data.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
+                <div class="mb-4 p-3 rounded-lg ${isBypassed ? 'bg-gray-50 border border-gray-200' : (data.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200')}">
                     <div class="flex items-center gap-2">
                         <span class="text-${statusColor}-600 text-xl font-bold">${statusIcon}</span>
                         <span class="text-${statusColor}-700 font-semibold">${statusText}</span>
@@ -830,7 +886,7 @@
                 ` : ''}
                 
                 <!-- Debug Info for Failed Videos -->
-                ${!data.success ? `
+                ${!data.success && !isBypassed ? `
                     <div class="mb-4">
                         <h4 class="font-semibold text-gray-700 mb-2">🔍 Troubleshooting</h4>
                         <div class="bg-gray-50 rounded-lg p-3 text-sm">
@@ -843,7 +899,7 @@
                     </div>
                 ` : ''}
                 
-                <!-- Actions -->
+                <!-- Actions - ALWAYS SHOWN -->
                 <div class="border-t pt-4 mt-4">
                     <h4 class="font-semibold text-gray-700 mb-3">Actions</h4>
                     <div class="flex flex-wrap gap-2">
@@ -959,6 +1015,7 @@
         function closeVideoModal() {
             document.getElementById('videoDetailsModal').classList.add('hidden');
             currentVideoPath = null;
+            currentVideoData = null;
         }
         
         async function modalRetry() {
